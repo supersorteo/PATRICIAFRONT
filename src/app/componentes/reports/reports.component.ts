@@ -82,9 +82,9 @@ pageSizeDaily = 5;
   private editClientHeaderTimer: any = null;
 
   //private API_BASE = 'http://localhost:8080/api'
-  //private API_BASE = 'https://excellsiorback-production.up.railway.app/api'
+  private API_BASE = 'https://excellsiorback-production.up.railway.app/api'
     //danilo pruebas
-  private API_BASE = "https://exellssiorpruebadanilo1-production.up.railway.app/api"
+ // private API_BASE = "https://exellssiorpruebadanilo1-production.up.railway.app/api"
 
   showReportsList = false;
   showClientsRanking = false;
