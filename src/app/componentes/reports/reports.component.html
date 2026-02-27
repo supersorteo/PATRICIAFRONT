@@ -58,7 +58,7 @@
     <div class="card stats-card">
       <div class="card-body text-center">
         <div class="stats-number text-success">${{dailyTotalCobrado.toLocaleString('es-AR')}}</div>
-        <div class="stats-label">Total Cobrado Hoy</div>
+        <div class="stats-label">Saldo pendiente</div>
       </div>
     </div>
   </div>
@@ -494,10 +494,6 @@
     </div>
 
     <div class="ranking-modal__body">
-      <p class="ranking-note mb-3">
-        Vista de interfaz lista. La lógica real para calcular frecuencia se integrará después.
-      </p>
-
       <div class="table-responsive ranking-table-wrapper">
         <table class="table table-dark table-striped align-middle mb-0">
           <thead>
@@ -561,4 +557,5 @@
   </div>
 </div>
 
-    <app-reports-list *ngIf="showReportsList"></app-reports-list>
+    <app-reports-list *ngIf="showReportsList" (closed)="closeReportsList()"></app-reports-list>
+

@@ -1,66 +1,81 @@
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="h4 mb-0">Lista de Reportes</h2>
-    <button class="btn btn-outline-primary btn-sm" (click)="refreshReports()">Recargar</button>
-  </div>
-
-  <div class="card">
-    <div class="card-body">
-      <div class="table-responsive">
-        <table class="table table-dark table-striped">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Tipo</th>
-              <th>Período</th>
-              <th>Fecha creación</th>
-              <th>Servicios</th>
-              <th>Total cobrado</th>
-              <th>Total Espacios</th>
-              <th>Ocupados</th>
-              <th>Libres</th>
-              <th>% Ocupación</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of reportRows; trackBy: trackByReportId">
-              <td>{{ row.id }}</td>
-              <td>
-                <span class="badge" [ngClass]="row.periodTypeLabel === 'Mensual' ? 'bg-warning text-dark' : 'bg-info text-dark'">
-                  {{ row.periodTypeLabel }}
-                </span>
-              </td>
-              <td>{{ row.periodTitle }}</td>
-              <td>{{ row.timestamp | date:'short' }}</td>
-              <td><span class="badge bg-primary">{{ row.servicesCount }}</span></td>
-              <td><strong class="text-success">${{ row.totalCobrado | number:'1.0-0' }}</strong></td>
-              <td>{{ row.totalSpaces }}</td>
-              <td><span class="badge bg-danger">{{ row.occupiedSpaces }}</span></td>
-              <td><span class="badge bg-success">{{ row.freeSpaces }}</span></td>
-              <td>
-                <div class="progress" style="height: 20px;">
-                  <div
-                    class="progress-bar"
-                    [ngClass]="row.occupancyRate < 50 ? 'bg-success' : row.occupancyRate < 80 ? 'bg-warning' : 'bg-danger'"
-                    [style.width.%]="row.occupancyRate"
-                  >
-                    {{ row.occupancyRate }}%
-                  </div>
-                </div>
-              </td>
-              <td>
-                <button class="btn btn-sm btn-outline-primary me-1" (click)="viewReport(row.id)">Ver</button>
-                <button class="btn btn-sm btn-outline-danger" (click)="deleteReport(row.id)">Eliminar</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+<div class="reports-modal" (click)="closeModal()">
+  <div
+    class="reports-modal__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reports-modal-title"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="reports-modal__header d-flex justify-content-between align-items-center gap-2">
+      <h2 id="reports-modal-title" class="h4 mb-0">Lista de Reportes</h2>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-primary btn-sm" (click)="refreshReports()">Recargar</button>
+        <button type="button" class="btn btn-outline-light btn-sm" (click)="closeModal()" aria-label="Cerrar modal">
+          Cerrar
+        </button>
       </div>
+    </div>
 
-      <div *ngIf="reportRows.length === 0" class="text-center text-muted py-4">
-        No hay reportes disponibles.
-        <button class="btn btn-sm btn-outline-primary" (click)="refreshReports()">Recargar</button>
+    <div class="reports-modal__body">
+      <div class="card reports-card">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-dark table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tipo</th>
+                  <th>Periodo</th>
+                  <th>Fecha creacion</th>
+                  <th>Servicios</th>
+                  <th>Total cobrado</th>
+                  <th>Total Espacios</th>
+                  <th>Ocupados</th>
+                  <th>Libres</th>
+                  <th>% Ocupacion</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of reportRows; trackBy: trackByReportId">
+                  <td>{{ row.id }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="row.periodTypeLabel === 'Mensual' ? 'bg-warning text-dark' : 'bg-info text-dark'">
+                      {{ row.periodTypeLabel }}
+                    </span>
+                  </td>
+                  <td>{{ row.periodTitle }}</td>
+                  <td>{{ row.timestamp | date:'short' }}</td>
+                  <td><span class="badge bg-primary">{{ row.servicesCount }}</span></td>
+                  <td><strong class="text-success">${{ row.totalCobrado | number:'1.0-0' }}</strong></td>
+                  <td>{{ row.totalSpaces }}</td>
+                  <td><span class="badge bg-danger">{{ row.occupiedSpaces }}</span></td>
+                  <td><span class="badge bg-success">{{ row.freeSpaces }}</span></td>
+                  <td>
+                    <div class="progress" style="height: 20px;">
+                      <div
+                        class="progress-bar"
+                        [ngClass]="row.occupancyRate < 50 ? 'bg-success' : row.occupancyRate < 80 ? 'bg-warning' : 'bg-danger'"
+                        [style.width.%]="row.occupancyRate"
+                      >
+                        {{ row.occupancyRate }}%
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" (click)="viewReport(row.id)">Ver</button>
+                    <button class="btn btn-sm btn-outline-danger" (click)="deleteReport(row.id)">Eliminar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="reportRows.length === 0" class="text-center text-muted py-4">
+            No hay reportes disponibles.
+            <button class="btn btn-sm btn-outline-primary ms-2" (click)="refreshReports()">Recargar</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

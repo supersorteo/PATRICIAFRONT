@@ -114,14 +114,14 @@ dailyClients: Client[] = [];
 Math: any;
 
 paymentMethodColors: { [key: string]: string } = {
-  efectivo:   '#0f5c2e',
-  credito:    '#8c3f00',
-  debito:     '#084c61',
-  prepago:    '#3f1d6e',
-  qr:         '#7a1a22',
-  scaneo:     '#8c4400',
-  'S/Cargo':  '#495057',
-  '':         '#212529'
+  efectivo:   'rgba(15, 92, 46, 0.5)',
+  credito:    'rgba(140, 63, 0, 0.5)',
+  debito:     'rgba(8, 76, 97, 0.5)',
+  prepago:    'rgba(63, 29, 110, 0.5)',
+  qr:         'rgba(122, 26, 34, 0.5)',
+  scaneo:     'rgba(140, 68, 0, 0.5)',
+  'S/Cargo':  'rgba(73, 80, 87, 0.5)',
+  '':         'rgba(33, 37, 41, 0.5)'
 };
 
 paymentColorsByClientId: { [clientId: string]: string } = {};
@@ -330,6 +330,10 @@ toggleReportsList(): void {
   if (this.showReportsList) {
     this.refreshStats(); // Actualiza stats al abrir
   }
+}
+
+closeReportsList(): void {
+  this.showReportsList = false;
 }
 
 

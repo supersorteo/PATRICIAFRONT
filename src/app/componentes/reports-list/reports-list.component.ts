@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { Report } from '../../models/autolavado.model';
 import { AutolavadoService } from '../../services/autolavado.service';
 
@@ -28,6 +28,7 @@ interface ReportListRow {
   styleUrl: './reports-list.component.scss'
 })
 export class ReportsListComponent implements OnInit{
+  @Output() closed = new EventEmitter<void>();
 
   reports: Report[] = [];
   reportRows: ReportListRow[] = [];
@@ -101,6 +102,15 @@ export class ReportsListComponent implements OnInit{
 
   refreshReports(): void {
     this.loadReports();
+  }
+
+  closeModal(): void {
+    this.closed.emit();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    this.closeModal();
   }
 
   private toRow(report: Report): ReportListRow {
