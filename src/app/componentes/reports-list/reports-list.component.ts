@@ -31,7 +31,7 @@ export class ReportsListComponent implements OnInit{
 
   reports: Report[] = [];
   reportRows: ReportListRow[] = [];
- // private apiBase = 'http://localhost:8080/api';
+  //private apiBase = 'http://localhost:8080/api';
   //private apiBase = 'https://excellsiorback-production.up.railway.app/api'
 
     //danilo pruebas

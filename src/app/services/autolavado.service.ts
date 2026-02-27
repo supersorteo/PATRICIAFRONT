@@ -1041,6 +1041,39 @@ getUniqueClientsFromBackend(): Observable<Client[]> {
 }
 
 
+getMonthlyServiceCountByDni(dni: string, monthKey?: string): Observable<number> {
+  const safeDni = (dni || '').trim();
+  if (!safeDni) return of(0);
+
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const month = monthKey || defaultMonth;
+
+  return this.http.get<number>(
+    `${this.API_BASE}/clients/dni/${encodeURIComponent(safeDni)}/monthly-count?month=${month}`
+  );
+}
+
+
+getMonthlyServiceCountsByDnis(dnis: string[], monthKey?: string): Observable<Record<string, number>> {
+  const cleanDnis = Array.from(new Set((dnis || [])
+    .map(d => (d || '').trim())
+    .filter(Boolean)));
+
+  if (!cleanDnis.length) return of({});
+
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const month = monthKey || defaultMonth;
+
+  return this.http.post<Record<string, number>>(
+    `${this.API_BASE}/clients/monthly-counts?month=${month}`,
+    cleanDnis
+  );
+}
+
+
+
 
 deleteClientFromBackend(clientId: number): Observable<any> {
   console.log('Eliminando cliente ID:', clientId, 'del backend');

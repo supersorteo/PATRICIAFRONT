@@ -56,9 +56,18 @@ private onPhoneCountryChangeListener = () => this.updatePhoneInfo(true);
 private onNewPhoneInputListener = () => this.updateNewPhoneInfo();
 private onNewPhoneCountryChangeListener = () => this.updateNewPhoneInfo();
 
-  allClients: Client[] = [];
-  clientReservationsHistory: Client[] = [];
- private activeClientVehiclesKey: string | null = null;
+allClients: Client[] = [];
+monthlyServiceCountByKey = new Map<string, number>();
+monthlyServiceCountLoadingKeys = new Set<string>();
+
+monthlyServiceCountByDni = new Map<string, number>();
+monthlyServiceCountBatchLoading = false;
+monthlyServiceCountCacheMonthKey = '';
+isClosingDay = false;
+
+
+clientReservationsHistory: Client[] = [];
+private activeClientVehiclesKey: string | null = null;
 
   searchTermClients = '';
   filteredClientsAdmin: Client[] = [];
@@ -318,99 +327,6 @@ this.uiRefreshIntervalId = setInterval(() => {
 
 
 
-/*this.clientForm.get('dni')?.valueChanges
-  .pipe(
-    debounceTime(600),
-    map((dni) => (dni || '').toString().trim()),
-    distinctUntilChanged(),
-    takeUntil(this.destroy$),
-    switchMap((dni) => {
-      if (dni.length < 7) {
-        this.existingClientId = null;
-        return of([] as Client[]);
-      }
-      return this.autolavadoService.getClientReservationsByDni(dni).pipe(
-        catchError(() => of([] as Client[]))
-      );
-    })
-  )
-  .subscribe((reservations) => {
-    if (!reservations.length) {
-      this.existingClientId = null;
-       //this.clientVehiclesList = [];
-      // this.clientVehicleEditor = { model: '', plate: '', notes: '' };
-       this.clearClientVehicleWorkingList();
-
-      //alert('Cliente nuevo. Se creará un registro.');
-      //console.log('Cliente nuevo. Se creará un registro.')
-      return;
-    }
-
-    // Ordenar por entryTimestamp o exitTimestamp (más reciente primero)
-    reservations.sort((a, b) => {
-      const aTs = new Date(a.entryTimestamp || a.exitTimestamp || 0).getTime();
-      const bTs = new Date(b.entryTimestamp || b.exitTimestamp || 0).getTime();
-      return bTs - aTs;
-    });
-
-    const client = reservations[0];
-
-    const isInactive = client.spaceKey === null || client.spaceKey === '';
-    if (isInactive) {
-      this.existingClientId = client.id;
-      alert(`Cliente encontrado: ${client.name}\nSe reutilizará su información (sin reserva activa).`);
-
-    } else {
-      this.existingClientId = null;
-      alert(`Cliente encontrado: ${client.name}\nYa tiene una reserva activa.\nSe creará una NUEVA reserva para otro vehículo.`);
-    }
-
-    // Cargar vehículos desde backend (plate/notes reales)
-    if (client.clientVehicles && client.clientVehicles.length > 0) {
-      this.clientVehiclesList = client.clientVehicles.map(cv => ({
-        model: cv.vehicleType?.model || '',
-        plate: cv.plate || '',
-        notes: cv.notes || ''
-      }));
-
-
-
-
-
-    const primaryVehicleItem = client.clientVehicles[0];
-   const primary = primaryVehicleItem?.vehicleType;
-
-   this.clientForm.patchValue({
-  name: client.name || '',
-  vehicle: primary?.model || client.vehicle || '',
-  price: primary?.price || client.price || null,
-  plate: primaryVehicleItem?.plate || client.plate || '',
-  notes: primaryVehicleItem?.notes || client.notes || '',
-  entryTimestamp: Date.now()
-}, { emitEvent: false });
-
-
-    } else {
-      this.clientForm.patchValue({
-        name: client.name || '',
-        plate: client.plate || '',
-        notes: client.notes || '',
-        vehicle: client.vehicle || '',
-        price: client.price || null,
-        entryTimestamp: Date.now()
-      }, { emitEvent: false });
-    }
-
-    setTimeout(() => {
-      const phoneToLoad = client.phoneIntl || client.phoneRaw || '';
-      if (phoneToLoad && this.iti) {
-        this.iti.setNumber(phoneToLoad);
-        this.updatePhoneInfo(false);
-        this.clientForm.patchValue({ phone: phoneToLoad }, { emitEvent: false });
-      }
-    }, 150);
-  });*/
-
 
   this.clientForm.get('dni')?.valueChanges
   .pipe(
@@ -455,87 +371,6 @@ this.uiRefreshIntervalId = setInterval(() => {
 
 
 
-
-
-ngAfterViewInit0(): void {
-    this.iti = intlTelInput(this.phoneInput.nativeElement, {
-    initialCountry: 'ar',
-    preferredCountries: ['ar', 'br', 'cl', 'co', 've', 'pe', 'bo', 'py', 'uy', 'ec', 'cu'],
-    utilsScript: 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/19.2.15/js/utils.js',
-    separateDialCode: true,
-    nationalMode: false,
-    formatOnDisplay: true,
-    autoPlaceholder: 'polite',
-    placeholderNumberType: 'MOBILE'
-  });
-
-  // Listener para input manual
-  this.phoneInput.nativeElement.addEventListener('input', () => {
-    this.updatePhoneInfo(true);
-  });
-
-  // Listener para cambio de país
-  this.phoneInput.nativeElement.addEventListener('countrychange', () => {
-    this.updatePhoneInfo(true);
-  });
-
-  // Listener para cambios externos (DNI, patchValue, etc.)
-  this.clientForm.get('phone')?.valueChanges
-    .pipe(
-      debounceTime(300), // Más tiempo para evitar loops rápidos
-      distinctUntilChanged()
-    )
-    .subscribe(newPhone => {
-      console.log('[valueChanges] Teléfono cambiado desde código:', newPhone);
-      if (newPhone && this.iti) {
-        const currentNumber = this.iti.getNumber();
-
-        // Solo actualizar si es diferente (evita loops infinitos)
-        if (currentNumber !== newPhone) {
-          console.log('[valueChanges] Actualizando iti con:', newPhone);
-          this.iti.setNumber(newPhone);
-          this.updatePhoneInfo(false); // false = carga externa
-        }
-      }
-    });
-
-  // Fuerza validación inicial si ya hay valor al cargar el modal
-  const initialPhone = this.clientForm.get('phone')?.value;
-  if (initialPhone && this.iti) {
-    console.log('[ngAfterViewInit] Validación inicial con teléfono existente:', initialPhone);
-    this.iti.setNumber(initialPhone);
-    this.updatePhoneInfo(false);
-  }
-
-
-  setTimeout(() => {
-  const phoneEl = document.getElementById('newPhoneIntlInput');
-  if (phoneEl) {
-    this.newIti = intlTelInput(phoneEl, {
-      initialCountry: 'ar',
-      preferredCountries: ['ar', 'br', 'cl', 'co', 've', 'pe', 'bo', 'py', 'uy', 'ec', 'cu'],
-      utilsScript: 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/19.2.15/js/utils.js',
-      separateDialCode: true,
-      nationalMode: false,
-      formatOnDisplay: true,
-      autoPlaceholder: 'polite',
-      placeholderNumberType: 'MOBILE'
-    });
-
-    phoneEl.addEventListener('input', () => this.updateNewPhoneInfo());
-    phoneEl.addEventListener('countrychange', () => this.updateNewPhoneInfo());
-
-    // Sincronizar valueChanges
-    this.newClientForm.get('phoneIntl')?.valueChanges.subscribe(value => {
-      if (value && this.newIti && this.newIti.getNumber() !== value) {
-        this.newIti.setNumber(value);
-        this.updateNewPhoneInfo();
-      }
-    });
-  }
-}, 0);
-
-}
 
 ngAfterViewInit(): void {
   this.iti = intlTelInput(this.phoneInput.nativeElement, {
@@ -782,20 +617,66 @@ private getIdentityKeyForClient(c: Client): string {
 }
 
 
-getMonthlyServiceCountForClient(client: Client): number {
-  const key = this.getIdentityKeyForClient(client);
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
 
-  return (this.allClients || [])
-    .filter(c => this.getIdentityKeyForClient(c) === key)
-    .filter(c => {
-      //const ts = this.toTimestampLocal(c.entryTimestamp);
-      const ts = this.toTimestampLocal(c.entryTimestamp ?? c.exitTimestamp);
-      return ts !== null && ts >= monthStart && ts < nextMonthStart;
-    }).length;
+
+
+getMonthlyServiceCountForClient0(client: Client): number {
+  const key = this.getIdentityKeyForClient(client);
+  if (!key) return 0;
+
+  if (!this.monthlyServiceCountByKey.has(key)) {
+    this.loadMonthlyServiceCountForClient(client);
+    return 0; // temporal mientras responde backend
+  }
+
+  return this.monthlyServiceCountByKey.get(key) ?? 0;
 }
+
+
+getMonthlyServiceCountForClient1(client: Client): number {
+  const dni = (client?.dni || '').toString().trim();
+  if (!dni) return 0;
+
+  // Lazy batch preload (puede dispararse varias veces, pero el método ya se protege)
+  this.preloadMonthlyServiceCountsForClients(this.filteredClientsAdmin || this.allClients || []);
+
+  return this.monthlyServiceCountByDni.get(dni) ?? 0;
+}
+
+getMonthlyServiceCountForClient(client: Client): number {
+  this.ensureMonthlyServiceCountCacheForCurrentMonth();
+
+  const dni = (client?.dni || '').toString().trim();
+  if (!dni) return 0;
+
+  this.preloadMonthlyServiceCountsForClients(this.filteredClientsAdmin || this.allClients || []);
+
+  return this.monthlyServiceCountByDni.get(dni) ?? 0;
+}
+
+
+private getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+
+private ensureMonthlyServiceCountCacheForCurrentMonth(): void {
+  const currentMonthKey = this.getCurrentMonthKey();
+
+  if (this.monthlyServiceCountCacheMonthKey !== currentMonthKey) {
+    console.log('[MonthlyCount] Cambio de mes detectado. Limpiando cache.', {
+      previous: this.monthlyServiceCountCacheMonthKey || '(empty)',
+      next: currentMonthKey
+    });
+
+    this.monthlyServiceCountByDni.clear();
+    this.monthlyServiceCountLoadingKeys?.clear?.(); // por si aún tienes esta estructura vieja
+    this.monthlyServiceCountBatchLoading = false;
+    this.monthlyServiceCountCacheMonthKey = currentMonthKey;
+  }
+}
+
 
 /*getClientTierByCount(count: number): 'oro' | 'plata' | 'bronce' | 'ninguno' {
   if (count >= this.TIER_ORO) return 'oro';
@@ -803,6 +684,144 @@ getMonthlyServiceCountForClient(client: Client): number {
   if (count >= this.TIER_BRONCE) return 'bronce';
   return 'ninguno';
 }*/
+
+
+
+private loadMonthlyServiceCountForClient(client: Client): void {
+  const dni = (client?.dni || '').toString().trim();
+  const key = this.getIdentityKeyForClient(client);
+
+  if (!dni || !key) return;
+  if (this.monthlyServiceCountByKey.has(key)) return;
+  if (this.monthlyServiceCountLoadingKeys.has(key)) return;
+
+  this.monthlyServiceCountLoadingKeys.add(key);
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  this.autolavadoService.getMonthlyServiceCountByDni(dni, monthKey).subscribe({
+    next: (count) => {
+      this.monthlyServiceCountByKey.set(key, Number(count || 0));
+      this.monthlyServiceCountLoadingKeys.delete(key);
+
+      console.log('[MonthlyCount] loaded', { dni, key, monthKey, count });
+      this.cdr.detectChanges();
+    },
+    error: (err) => {
+      this.monthlyServiceCountByKey.set(key, 0);
+      this.monthlyServiceCountLoadingKeys.delete(key);
+
+      console.warn('[MonthlyCount] error', { dni, key, err });
+    }
+  });
+}
+
+
+private preloadMonthlyServiceCountsForClients0(clients: Client[]): void {
+  if (this.monthlyServiceCountBatchLoading) return;
+
+  const dnis = Array.from(new Set(
+    (clients || [])
+      .map(c => (c?.dni || '').toString().trim())
+      .filter(Boolean)
+  ));
+
+  if (!dnis.length) return;
+
+  // Pedir solo los que faltan en cache
+  const missing = dnis.filter(dni => !this.monthlyServiceCountByDni.has(dni));
+  if (!missing.length) return;
+
+  this.monthlyServiceCountBatchLoading = true;
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  this.autolavadoService.getMonthlyServiceCountsByDnis(missing, monthKey).subscribe({
+    next: (counts) => {
+      Object.entries(counts || {}).forEach(([dni, count]) => {
+        this.monthlyServiceCountByDni.set(dni, Number(count || 0));
+      });
+
+      // Si backend no devolvió alguno, dejar 0
+      missing.forEach(dni => {
+        if (!this.monthlyServiceCountByDni.has(dni)) {
+          this.monthlyServiceCountByDni.set(dni, 0);
+        }
+      });
+
+      this.monthlyServiceCountBatchLoading = false;
+
+      console.log('[MonthlyCount][batch] loaded', {
+        monthKey,
+        requested: missing.length,
+        received: Object.keys(counts || {}).length
+      });
+
+      this.cdr.detectChanges();
+    },
+    error: (err) => {
+      this.monthlyServiceCountBatchLoading = false;
+      console.warn('[MonthlyCount][batch] error', err);
+
+      // fallback cache 0 para evitar reintentos infinitos
+      missing.forEach(dni => this.monthlyServiceCountByDni.set(dni, 0));
+    }
+  });
+}
+
+private preloadMonthlyServiceCountsForClients(clients: Client[]): void {
+  this.ensureMonthlyServiceCountCacheForCurrentMonth();
+
+  if (this.monthlyServiceCountBatchLoading) return;
+
+  const dnis = Array.from(new Set(
+    (clients || [])
+      .map(c => (c?.dni || '').toString().trim())
+      .filter(Boolean)
+  ));
+
+  if (!dnis.length) return;
+
+  const missing = dnis.filter(dni => !this.monthlyServiceCountByDni.has(dni));
+  if (!missing.length) return;
+
+  this.monthlyServiceCountBatchLoading = true;
+
+  const monthKey = this.monthlyServiceCountCacheMonthKey || this.getCurrentMonthKey();
+
+  this.autolavadoService.getMonthlyServiceCountsByDnis(missing, monthKey).subscribe({
+    next: (counts) => {
+      Object.entries(counts || {}).forEach(([dni, count]) => {
+        this.monthlyServiceCountByDni.set(dni, Number(count || 0));
+      });
+
+      missing.forEach(dni => {
+        if (!this.monthlyServiceCountByDni.has(dni)) {
+          this.monthlyServiceCountByDni.set(dni, 0);
+        }
+      });
+
+      this.monthlyServiceCountBatchLoading = false;
+
+      console.log('[MonthlyCount][batch] loaded', {
+        monthKey,
+        requested: missing.length,
+        received: Object.keys(counts || {}).length
+      });
+
+      this.cdr.detectChanges();
+    },
+    error: (err) => {
+      this.monthlyServiceCountBatchLoading = false;
+      console.warn('[MonthlyCount][batch] error', err);
+
+      missing.forEach(dni => this.monthlyServiceCountByDni.set(dni, 0));
+    }
+  });
+}
+
 
 
 get canSubmitClientVehicleEditor(): boolean {
@@ -2416,9 +2435,11 @@ private dedupeClientsForUI(clients: Client[]): Client[] {
 
 
 
-loadAllClientsFromBackend(): void {
+loadAllClientsFromBackend00(): void {
   this.autolavadoService.getUniqueClientsFromBackend().subscribe({
     next: (clients) => {
+      this.monthlyServiceCountByKey.clear();
+      this.monthlyServiceCountLoadingKeys.clear();
       this.allClients = clients;
       this.filteredClientsAdmin = clients;
       console.log('Todos los clientes cargados desde backend:', clients);
@@ -2429,6 +2450,26 @@ loadAllClientsFromBackend(): void {
     }
   });
 }
+
+loadAllClientsFromBackend(): void {
+  this.autolavadoService.getUniqueClientsFromBackend().subscribe({
+    next: (clients) => {
+      this.allClients = clients;
+      this.filteredClientsAdmin = clients;
+
+      this.ensureMonthlyServiceCountCacheForCurrentMonth();
+      this.monthlyServiceCountByDni.clear();
+      this.preloadMonthlyServiceCountsForClients(clients);
+
+      console.log('Clientes únicos cargados desde backend:', clients);
+    },
+    error: (err) => {
+      console.error('Error cargando clientes', err);
+      alert('No se pudieron cargar los clientes');
+    }
+  });
+}
+
 
 getSpaceByKey(spaceKey: string | null): Space | undefined {
   if (!spaceKey) return undefined;
@@ -4063,7 +4104,14 @@ cerrarDia1(): void {
 
 
 cerrarDia(): void {
+
+    if (this.isClosingDay) {
+    console.log('[CloseDay] cierre ya en curso, se ignora doble click');
+    return;
+  }
+
   const hoy = new Date().toLocaleDateString('es-AR');
+  this.isClosingDay = true;
   console.log('[CloseDay] Iniciando cierre manual del día via backend unificado...');
 
   this.autolavadoService.finalizeDailyReportAndCloseDayInBackend$().subscribe({
@@ -4073,6 +4121,7 @@ cerrarDia(): void {
       this.sentReleaseWhatsappBySpace.clear();
       localStorage.removeItem(this.WHATSAPP_SENT_STORAGE_KEY);
 
+      this.loadAllClientsFromBackend();
       this.filterSpaces();
       this.cdr.detectChanges();
 
@@ -4082,6 +4131,7 @@ cerrarDia(): void {
         `Datos sincronizados con el servidor.`;
 
       this.showModal('closeDayResultModal');
+       this.isClosingDay = false;
     },
     error: (err) => {
       console.warn('[CloseDay] Error en cierre manual unificado', err);
@@ -4091,6 +4141,7 @@ cerrarDia(): void {
         'No se aplicó el cierre completo. Intenta nuevamente.';
 
       this.showModal('closeDayResultModal');
+      this.isClosingDay = false;
     }
   });
 }
