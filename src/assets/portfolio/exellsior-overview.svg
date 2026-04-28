@@ -1,0 +1,75 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1490" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="1" stop-color="#0F2744"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="220" y1="160" x2="1260" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#13263D"/>
+      <stop offset="1" stop-color="#0B1727"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="343" y1="216" x2="1200" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12D7D0"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <filter id="shadow" x="170" y="110" width="1260" height="650" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="25" flood-color="#02101F" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1310" cy="140" r="220" fill="#12315B" fill-opacity="0.45"/>
+  <circle cx="240" cy="760" r="210" fill="#0B7C9F" fill-opacity="0.18"/>
+  <path d="M0 708C201 621 315 621 510 708C703 795 865 792 1085 685C1275 593 1409 592 1600 667V900H0V708Z" fill="#06111D"/>
+
+  <g filter="url(#shadow)">
+    <rect x="220" y="150" width="1160" height="600" rx="30" fill="url(#panel)" stroke="#28476F"/>
+  </g>
+
+  <rect x="220" y="150" width="1160" height="72" rx="30" fill="#0A1625"/>
+  <circle cx="272" cy="186" r="8" fill="#F97316"/>
+  <circle cx="302" cy="186" r="8" fill="#FACC15"/>
+  <circle cx="332" cy="186" r="8" fill="#34D399"/>
+
+  <text x="370" y="195" fill="#D9E7F7" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Exellsior</text>
+  <text x="370" y="228" fill="#7FA7D6" font-family="Arial, Helvetica, sans-serif" font-size="18">Gestion operativa para autolavado y control de espacios</text>
+
+  <rect x="280" y="280" width="310" height="150" rx="22" fill="#0F2135" stroke="#28476F"/>
+  <text x="315" y="330" fill="#8BB7E8" font-family="Arial, Helvetica, sans-serif" font-size="22">Espacios activos</text>
+  <text x="315" y="390" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700">128</text>
+  <rect x="460" y="350" width="90" height="32" rx="16" fill="#123E68"/>
+  <text x="478" y="372" fill="#8FD9FF" font-family="Arial, Helvetica, sans-serif" font-size="18">ahora</text>
+
+  <rect x="620" y="280" width="310" height="150" rx="22" fill="#0F2135" stroke="#28476F"/>
+  <text x="655" y="330" fill="#8BB7E8" font-family="Arial, Helvetica, sans-serif" font-size="22">Clientes del dia</text>
+  <text x="655" y="390" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700">46</text>
+  <rect x="810" y="350" width="86" height="32" rx="16" fill="#123E68"/>
+  <text x="825" y="372" fill="#8FD9FF" font-family="Arial, Helvetica, sans-serif" font-size="18">turnos</text>
+
+  <rect x="960" y="280" width="360" height="150" rx="22" fill="url(#accent)"/>
+  <text x="995" y="330" fill="#05233F" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Contactos y seguimiento</text>
+  <text x="995" y="388" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700">WhatsApp + QR</text>
+
+  <rect x="280" y="470" width="500" height="220" rx="24" fill="#0D1D30" stroke="#28476F"/>
+  <text x="318" y="518" fill="#E7F0FA" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Panel de espacios</text>
+  <text x="318" y="548" fill="#7FA7D6" font-family="Arial, Helvetica, sans-serif" font-size="18">Visualizacion de ocupacion en tiempo real</text>
+
+  <rect x="320" y="580" width="78" height="58" rx="14" fill="#1FBC72"/>
+  <rect x="415" y="580" width="78" height="58" rx="14" fill="#F97316"/>
+  <rect x="510" y="580" width="78" height="58" rx="14" fill="#1FBC72"/>
+  <rect x="605" y="580" width="78" height="58" rx="14" fill="#F97316"/>
+  <rect x="700" y="580" width="40" height="58" rx="14" fill="#1FBC72"/>
+  <text x="344" y="616" fill="#052014" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">SUB1</text>
+  <text x="439" y="616" fill="#351405" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">SUB2</text>
+  <text x="534" y="616" fill="#052014" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">SUB3</text>
+  <text x="629" y="616" fill="#351405" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">SUB4</text>
+
+  <rect x="820" y="470" width="500" height="220" rx="24" fill="#0D1D30" stroke="#28476F"/>
+  <text x="858" y="518" fill="#E7F0FA" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Resumen del sistema</text>
+  <text x="858" y="563" fill="#B8D3F0" font-family="Arial, Helvetica, sans-serif" font-size="26">Control de espacios</text>
+  <text x="858" y="603" fill="#B8D3F0" font-family="Arial, Helvetica, sans-serif" font-size="26">Registro de clientes y vehiculos</text>
+  <text x="858" y="643" fill="#B8D3F0" font-family="Arial, Helvetica, sans-serif" font-size="26">Reportes diarios y mensuales</text>
+
+  <circle cx="1260" cy="565" r="34" fill="#13C7D2"/>
+  <path d="M1244 565L1256 577L1277 552" stroke="#03233A" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

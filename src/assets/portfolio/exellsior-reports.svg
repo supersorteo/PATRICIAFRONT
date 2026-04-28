@@ -1,0 +1,64 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg4" x1="120" y1="40" x2="1510" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07121D"/>
+      <stop offset="1" stop-color="#163552"/>
+    </linearGradient>
+    <linearGradient id="card4" x1="970" y1="310" x2="1330" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg4)"/>
+  <rect x="130" y="100" width="1340" height="700" rx="38" fill="#0A1726" stroke="#2E4F72" stroke-width="2"/>
+
+  <text x="210" y="195" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700">Reportes y estadisticas</text>
+  <text x="210" y="242" fill="#89B3DF" font-family="Arial, Helvetica, sans-serif" font-size="24">Seguimiento de ocupacion, servicios, cobros y cierres diarios o mensuales</text>
+
+  <rect x="200" y="300" width="300" height="140" rx="24" fill="#102134" stroke="#34567B"/>
+  <rect x="530" y="300" width="300" height="140" rx="24" fill="#102134" stroke="#34567B"/>
+  <rect x="860" y="300" width="300" height="140" rx="24" fill="#102134" stroke="#34567B"/>
+  <rect x="1190" y="300" width="200" height="140" rx="24" fill="url(#card4)"/>
+
+  <text x="234" y="350" fill="#8CB6E5" font-family="Arial, Helvetica, sans-serif" font-size="22">Servicios del dia</text>
+  <text x="234" y="405" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">46</text>
+
+  <text x="564" y="350" fill="#8CB6E5" font-family="Arial, Helvetica, sans-serif" font-size="22">Total cobrado</text>
+  <text x="564" y="405" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">$1.2M</text>
+
+  <text x="894" y="350" fill="#8CB6E5" font-family="Arial, Helvetica, sans-serif" font-size="22">Ocupacion</text>
+  <text x="894" y="405" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">74%</text>
+
+  <text x="1228" y="350" fill="#05314B" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Auto</text>
+  <text x="1228" y="405" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">PDF / HTML</text>
+
+  <rect x="200" y="500" width="620" height="230" rx="28" fill="#102134" stroke="#34567B"/>
+  <text x="240" y="550" fill="#E8F1FB" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Ocupacion por subsuelo</text>
+
+  <text x="240" y="605" fill="#B8D2EE" font-family="Arial, Helvetica, sans-serif" font-size="22">SUB1</text>
+  <rect x="340" y="586" width="380" height="22" rx="11" fill="#16314D"/>
+  <rect x="340" y="586" width="280" height="22" rx="11" fill="#0EA5E9"/>
+
+  <text x="240" y="650" fill="#B8D2EE" font-family="Arial, Helvetica, sans-serif" font-size="22">SUB2</text>
+  <rect x="340" y="631" width="380" height="22" rx="11" fill="#16314D"/>
+  <rect x="340" y="631" width="320" height="22" rx="11" fill="#22C55E"/>
+
+  <text x="240" y="695" fill="#B8D2EE" font-family="Arial, Helvetica, sans-serif" font-size="22">SUB3</text>
+  <rect x="340" y="676" width="380" height="22" rx="11" fill="#16314D"/>
+  <rect x="340" y="676" width="210" height="22" rx="11" fill="#F97316"/>
+
+  <rect x="860" y="500" width="530" height="230" rx="28" fill="#102134" stroke="#34567B"/>
+  <text x="900" y="550" fill="#E8F1FB" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Metodos de pago y cierres</text>
+
+  <path d="M950 678L950 615L1010 590L1070 610L1130 560L1190 580L1250 525L1310 550" stroke="#38BDF8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1010" cy="590" r="8" fill="#38BDF8"/>
+  <circle cx="1130" cy="560" r="8" fill="#38BDF8"/>
+  <circle cx="1250" cy="525" r="8" fill="#38BDF8"/>
+
+  <rect x="900" y="592" width="26" height="98" rx="8" fill="#22C55E"/>
+  <rect x="940" y="628" width="26" height="62" rx="8" fill="#F97316"/>
+  <rect x="980" y="605" width="26" height="85" rx="8" fill="#0EA5E9"/>
+  <text x="900" y="720" fill="#9ABFE7" font-family="Arial, Helvetica, sans-serif" font-size="20">Efectivo</text>
+  <text x="1035" y="720" fill="#9ABFE7" font-family="Arial, Helvetica, sans-serif" font-size="20">Credito / Debito / QR</text>
+</svg>

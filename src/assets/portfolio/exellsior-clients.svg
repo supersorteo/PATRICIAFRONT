@@ -1,0 +1,53 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#09131F"/>
+      <stop offset="1" stop-color="#102B43"/>
+    </linearGradient>
+    <linearGradient id="whats" x1="1030" y1="230" x2="1320" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#23D366"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg3)"/>
+  <circle cx="1380" cy="170" r="170" fill="#0EA5E9" fill-opacity="0.12"/>
+  <circle cx="210" cy="760" r="220" fill="#22C55E" fill-opacity="0.08"/>
+
+  <rect x="120" y="100" width="1360" height="700" rx="36" fill="#0B1828" stroke="#2F4F73" stroke-width="2"/>
+  <text x="200" y="196" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700">Clientes, vehiculos y contacto</text>
+  <text x="200" y="242" fill="#8CB6E5" font-family="Arial, Helvetica, sans-serif" font-size="24">Registro operativo con validacion de datos, historial y automatizacion de mensajes</text>
+
+  <rect x="180" y="300" width="700" height="420" rx="28" fill="#102033" stroke="#36577A"/>
+  <text x="224" y="356" fill="#E8F1FB" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Ficha del cliente</text>
+
+  <rect x="224" y="395" width="270" height="64" rx="16" fill="#132944"/>
+  <rect x="524" y="395" width="270" height="64" rx="16" fill="#132944"/>
+  <rect x="224" y="485" width="570" height="64" rx="16" fill="#132944"/>
+  <rect x="224" y="575" width="270" height="64" rx="16" fill="#132944"/>
+  <rect x="524" y="575" width="270" height="64" rx="16" fill="#132944"/>
+
+  <text x="246" y="435" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="18">Nombre y apellido</text>
+  <text x="546" y="435" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="18">DNI / Telefono</text>
+  <text x="246" y="525" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="18">Vehiculo seleccionado y precio del servicio</text>
+  <text x="246" y="615" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="18">Patente</text>
+  <text x="546" y="615" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="18">Notas</text>
+
+  <rect x="960" y="300" width="420" height="190" rx="28" fill="url(#whats)"/>
+  <text x="1002" y="360" fill="#06263A" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">WhatsApp integrado</text>
+  <text x="1002" y="406" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="24">Mensajes listos para enviar</text>
+  <path d="M1261 365C1261 406 1227 440 1186 440C1171 440 1157 436 1145 429L1108 439L1119 405C1112 393 1108 379 1108 365C1108 324 1144 290 1186 290C1227 290 1261 324 1261 365Z" fill="#F3FFF8" fill-opacity="0.95"/>
+  <path d="M1158 344C1163 340 1169 339 1174 345L1184 357C1187 360 1186 365 1183 368L1178 373C1185 385 1194 393 1207 398L1212 393C1215 390 1220 389 1223 392L1235 402C1241 407 1239 414 1234 418C1215 432 1175 418 1155 389C1136 362 1140 351 1158 344Z" fill="#23D366"/>
+
+  <rect x="960" y="520" width="420" height="200" rx="28" fill="#102033" stroke="#36577A"/>
+  <text x="1002" y="575" fill="#E8F1FB" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">QR y seguimiento</text>
+  <rect x="1020" y="605" width="110" height="110" rx="10" fill="#FFFFFF"/>
+  <rect x="1036" y="621" width="26" height="26" fill="#0B1828"/>
+  <rect x="1070" y="621" width="18" height="18" fill="#0B1828"/>
+  <rect x="1036" y="655" width="18" height="18" fill="#0B1828"/>
+  <rect x="1070" y="681" width="26" height="18" fill="#0B1828"/>
+  <rect x="1104" y="621" width="10" height="44" fill="#0B1828"/>
+  <rect x="1044" y="689" width="18" height="10" fill="#0B1828"/>
+  <text x="1170" y="635" fill="#9FC2E6" font-family="Arial, Helvetica, sans-serif" font-size="22">Entrega digital</text>
+  <text x="1170" y="673" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Ingreso y salida</text>
+</svg>

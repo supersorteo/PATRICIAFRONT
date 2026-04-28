@@ -1853,7 +1853,7 @@ buildWhatsAppMessageRelease(client: Client): string {
 
 El servicio completo de su vehículo ha finalizado. Todo listo para la entrega.
 
-Puede pasar por nuestras instalaciones cuando le sea conveniente, recuerde que nuestro horario de atención es hasta las 20hs. La esperamos para la entrega de llaves y realizar el abono final.
+Puede pasar por nuestras instalaciones cuando le sea conveniente, recuerde que nuestro horario de atención es hasta las 19hs. La esperamos para la entrega de llaves y realizar el abono final.
 
 Muchas gracias por confiar en Exellssior. 🚗✨`;
 }
