@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, combineLatest, forkJoin, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
 import { ClientVehicle, Report, VehicleType } from '../models/autolavado.model';
+import { environment } from '../../environments/environment';
 
 // Interfaces
 export interface Subsuelo {
@@ -79,16 +80,7 @@ export class AutolavadoService {
   public currentSubIdSubject = new BehaviorSubject<string | null>(null);
   private searchTermSubject = new BehaviorSubject<string>('');
 
-
-
-  // private API_BASE = 'http://localhost:8080/api'
-   private API_BASE = 'https://excellsiorback-production.up.railway.app/api'
-
-     //danilo pruebas
- // private API_BASE = "https://exellssiorpruebadanilo1-production.up.railway.app/api"
-
-
-
+  private API_BASE = environment.apiUrl;
 
   // Observables públicos
   public subsuelos$ = this.subsuelosSubject.asObservable();
@@ -340,82 +332,6 @@ initializeDataFromBackend(): void {
 
 
 
-initializeDataPreferBackend0(force: boolean = false): void {
-  if (this.isInitializingFromBackend) {
-    console.log('[INIT] Ya hay una inicialización en curso. Se omite llamada duplicada.');
-    return;
-  }
-
-  if (this.hasCompletedInitialBackendSync && !force) {
-    console.log('[INIT] Sync inicial con backend ya completado. Se omite (use force=true para recargar).');
-    return;
-  }
-
-  this.isInitializingFromBackend = true;
-  console.log('[INIT] Inicializando datos (backend primero, localStorage fallback)...');
-
-  this.loadSpacesFromBackend().pipe(
-    tap((spacesFromBackend: Space[]) => {
-      console.log('[INIT] Spaces desde backend:', spacesFromBackend.length, spacesFromBackend);
-    }),
-    switchMap((spacesFromBackend: Space[]) => {
-      const spacesMap: { [key: string]: Space } = {};
-      spacesFromBackend.forEach(s => spacesMap[s.key] = s);
-      this.spacesSubject.next(spacesMap);
-
-      return this.loadClientsFromBackend().pipe(
-        tap((clientsFromBackend: Client[]) => {
-          console.log('[INIT] Clients desde backend:', clientsFromBackend.length, clientsFromBackend);
-        }),
-        map((clientsFromBackend) => ({ spacesMap, clientsFromBackend }))
-      );
-    }),
-    tap(({ spacesMap, clientsFromBackend }) => {
-      const clientsMap: { [key: string]: Client } = {};
-      clientsFromBackend.forEach(c => clientsMap[c.id.toString()] = c);
-
-      console.log('[INIT] clientsMap armado:', Object.keys(clientsMap).length, clientsMap);
-
-      this.clientsSubject.next(clientsMap);
-
-      // Rehidratar relación space.client para la UI
-      Object.values(spacesMap).forEach(space => {
-        if (space.occupied && space.clientId && clientsMap[space.clientId]) {
-          space.client = clientsMap[space.clientId];
-        } else {
-          space.client = null;
-        }
-      });
-
-      console.log('[INIT] spacesMap rehidratado:', Object.keys(spacesMap).length, spacesMap);
-
-      this.spacesSubject.next({ ...spacesMap });
-      this.saveAll();
-
-      this.hasCompletedInitialBackendSync = true;
-
-      console.log('[INIT] Datos cargados desde backend y localStorage sincronizado');
-      console.log('[INIT] localStorage keys usadas:', this.LS_KEYS);
-    }),
-    catchError((err) => {
-      console.warn('[INIT] Backend no disponible. Usando localStorage como fallback.', err);
-      this.loadAll();
-      console.log('[INIT] Estado cargado desde localStorage (fallback):', {
-        subsuelos: this.subsuelosSubject.value,
-        spaces: this.spacesSubject.value,
-        clients: this.clientsSubject.value
-      });
-      return of(null);
-    })
-  ).subscribe({
-    complete: () => {
-      this.isInitializingFromBackend = false;
-    },
-    error: () => {
-      this.isInitializingFromBackend = false;
-    }
-  });
-}
 
 
 initializeDataPreferBackend(force: boolean = false): void {
@@ -1363,76 +1279,6 @@ addSpacesToCurrent(count: number): void {
 
 
 
-saveClient0(clientData: any, spaceKey: string): Client {
-  const spaces = this.spacesSubject.value;
-  const clients = this.clientsSubject.value;
-  const targetSpace = spaces[spaceKey];
-
-  if (!targetSpace) throw new Error('Espacio no encontrado');
-  if (targetSpace.occupied) throw new Error('El espacio ya está ocupado');
-
-  // GENERAR SOLO CODE
-  const code = this.generateClientCode();
-
-  // TELÉFONO: usar exactamente lo que el usuario escribió (con + si lo puso)
-  let phoneIntl = (clientData.phone || '').trim();
-
-  // Limpiar solo caracteres no válidos (mantener + y números)
-  phoneIntl = phoneIntl.replace(/[^0-9+]/g, '');
-
-  // Si no tiene + → asumir Argentina (+54)
- /* if (!phoneIntl.startsWith('+')) {
-    phoneIntl = '+54' + phoneIntl;
-  }*/
-
-  // Validación básica internacional (8-15 dígitos totales)
-  const digitsOnly = phoneIntl.replace(/[^0-9]/g, '');
-  if (digitsOnly.length < 8 || digitsOnly.length > 15) {
-    throw new Error('Número de teléfono inválido (debe tener entre 8 y 15 dígitos)');
-  }
-
-  const category = clientData.category || 'AUTO';
-  const price = clientData.price && clientData.price > 0 ? clientData.price : 35000;
-
-  // ID TEMPORAL para local
-  const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
-  const client: Client = {
-    id: tempId,
-    code,
-    dni: clientData.dni?.trim() || '',
-    name: clientData.name.trim(),
-    phoneIntl,               // ← Ahora es correcto: +53..., +54..., etc.
-    phoneRaw: clientData.phone.trim(),  // Lo que el usuario escribió originalmente
-    vehicle: clientData.vehicle?.trim() || '',
-    plate: clientData.plate?.trim() || '',
-    notes: clientData.notes?.trim() || '',
-    spaceKey,
-    qrText: '',
-    category,
-    price,
-    entryTimestamp: Date.now()
-  };
-
-  // Asignar al espacio
-  targetSpace.occupied = true;
-  targetSpace.clientId = tempId;
-  targetSpace.startTime = Date.now();
-  targetSpace.hold = false;
-  targetSpace.client = client;
-
-  // Generar QR
-  client.qrText = this.buildQRText(client, targetSpace);
-
-  // Guardar localmente
-  clients[tempId] = client;
-
-  this.spacesSubject.next({ ...spaces });
-  this.clientsSubject.next({ ...clients });
-  this.saveAll();
-
-  return client;
-}
 
 saveClient(clientData: any, spaceKey: string): Client {
   const currentSpaces = this.spacesSubject.value;
@@ -2155,6 +2001,7 @@ refreshClientsFromBackend(): void {
 
 
 generateReportsListHtml(): string { // Sin parámetro; fetch interno
+  const apiBase = this.API_BASE;
   const reportHtml = `
 <!DOCTYPE html>
 <html lang="es">
@@ -2183,10 +2030,7 @@ generateReportsListHtml(): string { // Sin parámetro; fetch interno
     <div id="reportsTableContainer" class="loading">Cargando reportes...</div>
   </div>
   <script>
-
-    const API_BASE1 = 'http://localhost:8080/api';
-
-    const API_BASE = 'https://talented-connection-production.up.railway.app/api'
+    const API_BASE = '${apiBase}';
 
     function loadReports() {
       document.getElementById('reportsTableContainer').innerHTML = '<div class="loading">Cargando...</div>';

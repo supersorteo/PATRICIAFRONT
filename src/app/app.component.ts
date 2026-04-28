@@ -5,6 +5,7 @@ import { ReportsComponent } from "./componentes/reports/reports.component";
 import { ArribaComponent } from "./componentes/arriba/arriba.component";
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { environment } from '../environments/environment';
 
 
 @Component({
@@ -23,12 +24,7 @@ export class AppComponent {
   isLoading = false;
   showPassword = false;
   isCheckingAuth = true;
- // private apiUrl = "http://localhost:8080";
-  private apiUrl = "https://excellsiorback-production.up.railway.app"
-
-
-  //danilo pruebas
-  //private apiUrl = "https://exellssiorpruebadanilo1-production.up.railway.app"
+  private apiUrl = environment.backendUrl;
   token = '';
 
   constructor(private http: HttpClient) {

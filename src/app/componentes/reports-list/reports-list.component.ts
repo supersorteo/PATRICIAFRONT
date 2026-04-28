@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { Report } from '../../models/autolavado.model';
 import { AutolavadoService } from '../../services/autolavado.service';
+import { environment } from '../../../environments/environment';
 
 interface ReportListRow {
   raw: Report;
@@ -32,13 +33,7 @@ export class ReportsListComponent implements OnInit{
 
   reports: Report[] = [];
   reportRows: ReportListRow[] = [];
- // private apiBase = 'http://localhost:8080/api';
-  private apiBase = 'https://excellsiorback-production.up.railway.app/api'
-
-    //danilo pruebas
-  //private apiBase = "https://exellssiorpruebadanilo1-production.up.railway.app/api"
-
-
+  private apiBase = environment.apiUrl;
 
    constructor(private http: HttpClient, private autolavadoService:AutolavadoService) {}
 
