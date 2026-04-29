@@ -1,17 +1,31 @@
-<div class="global-toast-stack" *ngIf="toasts$ | async as toasts">
+<div class="global-toast-stack">
   <div
-    *ngFor="let toast of toasts; trackBy: trackByToastId"
+    *ngFor="let toast of (toasts$ | async) ?? []; trackBy: trackByToastId"
     class="global-toast"
     [ngClass]="'global-toast--' + toast.variant"
+    role="status"
+    aria-live="polite"
   >
-    <div class="global-toast__message">{{ toast.message }}</div>
+    <div class="global-toast__accent"></div>
+
+    <div class="global-toast__icon" [ngClass]="'global-toast__icon--' + toast.variant" aria-hidden="true">
+      <i class="fas" [ngClass]="iconClass(toast.variant)"></i>
+    </div>
+
+    <div class="global-toast__content">
+      <div class="global-toast__header">
+        <span class="global-toast__label">{{ variantLabel(toast.variant) }}</span>
+      </div>
+      <div class="global-toast__message">{{ toast.message }}</div>
+    </div>
+
     <button
       type="button"
       class="global-toast__close"
-      aria-label="Cerrar notificación"
+      aria-label="Cerrar notificacion"
       (click)="dismiss(toast)"
     >
-      ×
+      <i class="fas fa-xmark" aria-hidden="true"></i>
     </button>
   </div>
 </div>

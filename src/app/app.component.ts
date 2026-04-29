@@ -22,7 +22,7 @@ import { environment } from '../environments/environment';
     GlobalConfirmDialogComponent
   ],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrls: ['./app.component.scss']
 })
 export class AppComponent {
   title = 'Gestión de Autolavado-Parking';
@@ -91,19 +91,7 @@ export class AppComponent {
     });
   }
 
-  private verifyToken0(): void {
-    const headers = new HttpHeaders().set('Authorization', `Bearer ${this.token}`);
-    this.http.get(`${this.apiUrl}/api/auth/users`, { headers }).subscribe({
-      next: () => {
-        this.isLoggedIn = true;
-        this.isCheckingAuth = false;
-      },
-      error: () => {
-        this.logout0();
-        this.isCheckingAuth = false;
-      }
-    });
-  }
+
 
   private verifyToken(): void {
     const headers = new HttpHeaders().set('Authorization', `Bearer ${this.token}`);
@@ -114,39 +102,15 @@ export class AppComponent {
       },
       error: (err) => {
         console.warn('Verificación de token falló:', err.status, err.message);
-        this.logout0();
+        this.logout();
         this.isCheckingAuth = false;
       }
     });
   }
 
-  private tryLogin(username: string, password: string, silent: boolean = false): void {
-    if (!silent) {
-      this.isLoading = true;
-      this.errorMessage = '';
-    }
 
-    const authHeader = 'Basic ' + btoa(username + ':' + password);
 
-    this.http.get(`${this.apiUrl}/api/auth/users`, {
-      headers: { Authorization: authHeader }
-    }).subscribe({
-      next: () => {
-        this.isLoggedIn = true;
-        this.isCheckingAuth = false;
-        this.username = username;
-        localStorage.setItem('auth', JSON.stringify({ username, password }));
-      },
-      error: () => {
-        this.isLoading = false;
-        this.isCheckingAuth = false;
-        this.errorMessage = 'Sesión expirada o credenciales inválidas. Iniciá sesión nuevamente.';
-        localStorage.removeItem('auth');
-      }
-    });
-  }
-
-  logout0(): void {
+  logout(): void {
     this.isLoggedIn = false;
     this.token = '';
     this.username = '';
@@ -168,7 +132,7 @@ export class AppComponent {
       return;
     }
 
-    this.logout0();
+    this.logout();
     this.toastService.showSuccess('Sesión cerrada correctamente.');
   }
 }

@@ -5,6 +5,8 @@ import { Report } from '../../models/autolavado.model';
 import { AutolavadoService, PagedResponse } from '../../services/autolavado.service';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
+import { ToastService } from '../../services/toast.service';
+import { ConfirmService } from '../../services/confirm.service';
 
 interface ReportListRow {
   raw: Report;
@@ -27,7 +29,7 @@ interface ReportListRow {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './reports-list.component.html',
-  styleUrl: './reports-list.component.scss'
+  styleUrls: ['./reports-list.component.scss']
 })
 export class ReportsListComponent implements OnInit{
   @Output() closed = new EventEmitter<void>();
@@ -44,7 +46,12 @@ export class ReportsListComponent implements OnInit{
   private searchTimer: any = null;
   private apiBase = environment.apiUrl;
 
-   constructor(private http: HttpClient, private autolavadoService:AutolavadoService) {}
+   constructor(
+    private http: HttpClient,
+    private autolavadoService: AutolavadoService,
+    private toastService: ToastService,
+    private confirmService: ConfirmService
+  ) {}
 
    ngOnInit(): void {
     this.loadReports();
@@ -83,7 +90,7 @@ export class ReportsListComponent implements OnInit{
       },
       error: (error) => {
         console.error('Error loading reports', error);
-        alert('Error al cargar reportes: ' + error.message + '. Verifica backend.');
+        this.toastService.showError('Error al cargar reportes: ' + error.message + '. Verifica backend.');
         this.reports = [];
         this.reportRows = [];
       },
@@ -109,24 +116,38 @@ export class ReportsListComponent implements OnInit{
       },
       error: (error) => {
         console.error('Error viewing report', error);
-        alert('Error al ver reporte');
+        this.toastService.showError('Error al ver el reporte.');
       }
     });
   }
 
   deleteReport(id: number): void {
-    if (confirm('¿Eliminar reporte ID ' + id + '?')) {
-      this.http.delete<void>(`${this.apiBase}/reports/${id}`).subscribe({
-        next: () => {
-          this.loadReports();
-          alert('Reporte eliminado.');
-        },
-        error: (error) => {
-          console.error('Error deleting report', error);
-          alert('Error al eliminar.');
-        }
-      });
+    void this.deleteReportWithConfirm(id);
+  }
+
+  private async deleteReportWithConfirm(id: number): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Eliminar reporte',
+      message: `Eliminar reporte ID ${id}? Esta accion no se puede deshacer.`,
+      confirmText: 'Eliminar reporte',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+
+    if (!confirmed) {
+      return;
     }
+
+    this.http.delete<void>(`${this.apiBase}/reports/${id}`).subscribe({
+      next: () => {
+        this.loadReports();
+        this.toastService.showSuccess('Reporte eliminado correctamente.');
+      },
+      error: (error) => {
+        console.error('Error deleting report', error);
+        this.toastService.showError('Error al eliminar el reporte.');
+      }
+    });
   }
 
   refreshReports(): void {

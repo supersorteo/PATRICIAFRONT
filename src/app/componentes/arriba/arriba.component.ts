@@ -6,9 +6,9 @@ import { Component } from '@angular/core';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './arriba.component.html',
-  styleUrl: './arriba.component.scss'
+  styleUrls: ['./arriba.component.scss']
 })
 export class ArribaComponent {
-  title='Gestión de Autolavado-Parking — Bosquejo'
+  title = 'Gestión de Autolavado-Parking';
 
 }

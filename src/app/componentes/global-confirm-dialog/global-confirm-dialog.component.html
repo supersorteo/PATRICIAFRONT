@@ -1,27 +1,44 @@
 <ng-container *ngIf="dialog$ | async as dialog">
   <div class="global-confirm-backdrop" (click)="cancel()"></div>
   <div class="global-confirm-shell" role="dialog" aria-modal="true" aria-labelledby="global-confirm-title">
-    <div class="global-confirm-card">
+    <div class="global-confirm-card" [ngClass]="'global-confirm-card--' + dialog.variant">
+      <div class="global-confirm-card__accent"></div>
+
       <div class="global-confirm-card__header">
-        <h3 id="global-confirm-title" class="global-confirm-card__title">{{ dialog.title }}</h3>
+        <div class="global-confirm-card__icon" [ngClass]="'global-confirm-card__icon--' + dialog.variant" aria-hidden="true">
+          <i class="fas" [ngClass]="variantIcon(dialog.variant)"></i>
+        </div>
+
+        <div class="global-confirm-card__heading">
+          <span class="global-confirm-card__badge">{{ variantBadge(dialog.variant) }}</span>
+          <h3 id="global-confirm-title" class="global-confirm-card__title">{{ dialog.title }}</h3>
+        </div>
+
+        <button
+          type="button"
+          class="global-confirm-card__dismiss"
+          aria-label="Cerrar confirmacion"
+          (click)="cancel()"
+        >
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
       </div>
+
       <div class="global-confirm-card__body">
         <p class="global-confirm-card__message">{{ dialog.message }}</p>
       </div>
+
       <div class="global-confirm-card__actions">
-        <button type="button" class="btn btn-outline-secondary" (click)="cancel()">
+        <button type="button" class="global-confirm-card__button global-confirm-card__button--secondary" (click)="cancel()">
           {{ dialog.cancelText }}
         </button>
         <button
           type="button"
-          class="btn"
-          [ngClass]="{
-            'btn-primary': dialog.variant === 'primary',
-            'btn-danger': dialog.variant === 'danger',
-            'btn-warning text-dark': dialog.variant === 'warning'
-          }"
+          class="global-confirm-card__button global-confirm-card__button--primary"
+          [ngClass]="'global-confirm-card__button--' + dialog.variant"
           (click)="accept()"
         >
+          <i class="fas" [ngClass]="variantIcon(dialog.variant)" aria-hidden="true"></i>
           {{ dialog.confirmText }}
         </button>
       </div>

@@ -980,6 +980,101 @@
 </div>
 
 
+<div class="transfer-space-modal" *ngIf="showTransferSpaceModal">
+  <div class="transfer-space-modal__backdrop" (click)="closeTransferSpaceModal()"></div>
+
+  <div class="transfer-space-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-space-title">
+    <div class="transfer-space-modal__card">
+      <div class="transfer-space-modal__accent"></div>
+
+      <div class="transfer-space-modal__header">
+        <div class="transfer-space-modal__icon" aria-hidden="true">
+          <i class="fas fa-right-left"></i>
+        </div>
+
+        <div class="transfer-space-modal__heading">
+          <span class="transfer-space-modal__eyebrow">Transferencia de espacio</span>
+          <h5 id="transfer-space-title" class="transfer-space-modal__title">
+            Elegir subsuelo destino
+          </h5>
+          <p class="transfer-space-modal__subtitle">
+            Espacio <span class="code-badge">{{ selectedSpace?.displayName || selectedSpaceKey }}</span>
+            desde <strong>{{ selectedSpace?.subsueloId }}</strong>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="transfer-space-modal__close"
+          aria-label="Cerrar seleccion de subsuelo"
+          [disabled]="isSubmittingTransferSpace"
+          (click)="closeTransferSpaceModal()">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="transfer-space-modal__body">
+        <div class="transfer-space-modal__grid">
+          <button
+            *ngFor="let option of transferSubsueloOptions"
+            type="button"
+            class="transfer-space-option"
+            [class.transfer-space-option--selected]="selectedTransferSubsueloId === option.id"
+            [disabled]="isSubmittingTransferSpace"
+            (click)="selectTransferSubsuelo(option.id)">
+            <div class="transfer-space-option__check">
+              <i class="fas" [ngClass]="selectedTransferSubsueloId === option.id ? 'fa-circle-check' : 'fa-circle'"></i>
+            </div>
+
+            <div class="transfer-space-option__content">
+              <div class="transfer-space-option__topline">
+                <span class="transfer-space-option__label">{{ option.label }}</span>
+                <span class="transfer-space-option__id">{{ option.id }}</span>
+              </div>
+
+              <div class="transfer-space-option__stats">
+                <span class="transfer-space-option__stat transfer-space-option__stat--total">
+                  <i class="fas fa-table-cells-large me-1"></i>{{ option.totalSpaces }} espacios
+                </span>
+                <span class="transfer-space-option__stat transfer-space-option__stat--free">
+                  <i class="fas fa-circle-check me-1"></i>{{ option.freeSpaces }} libres
+                </span>
+                <span class="transfer-space-option__stat transfer-space-option__stat--occupied">
+                  <i class="fas fa-car-side me-1"></i>{{ option.occupiedSpaces }} ocupados
+                </span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="transfer-space-modal__footer">
+        <button
+          type="button"
+          class="transfer-space-modal__button transfer-space-modal__button--secondary"
+          [disabled]="isSubmittingTransferSpace"
+          (click)="closeTransferSpaceModal()">
+          Cancelar
+        </button>
+
+        <button
+          type="button"
+          class="transfer-space-modal__button transfer-space-modal__button--primary"
+          [disabled]="!selectedTransferSubsueloId || isSubmittingTransferSpace"
+          (click)="confirmTransferSpaceSelection()">
+          <span *ngIf="!isSubmittingTransferSpace">
+            <i class="fas fa-arrow-right-arrow-left me-2"></i>Confirmar transferencia
+          </span>
+          <span *ngIf="isSubmittingTransferSpace">
+            <i class="fas fa-spinner fa-spin me-2"></i>Transfiriendo...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
     <!-- Occupied Modal -->
     <div class="modal fade" id="occupiedModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">

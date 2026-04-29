@@ -8,6 +8,8 @@ import { HttpClient } from '@angular/common/http';
 import { ReportsListComponent } from "../reports-list/reports-list.component";
 import { FormatPhonePipe } from "../../services/format-phone.pipe";
 import { environment } from '../../../environments/environment';
+import { ToastService } from '../../services/toast.service';
+import { ConfirmService } from '../../services/confirm.service';
 
 declare const bootstrap: any;
 
@@ -89,18 +91,6 @@ pageSizeDaily = 5;
   currentRankingPage = 1;
   rankingPageSize = 12;
 
-  //private readonly TIER_ORO = 10;
-  //private readonly TIER_PLATA = 5;
-  //private readonly TIER_BRONCE = 3;
-
- /* rankingPreview: RankingClienteView[] = Array.from({ length: 100 }, (_, i) => ({
-    position: i + 1,
-    name: `Cliente ${String(i + 1).padStart(3, '0')}`,
-    dni: `${42000000 + i}`,
-    phone: `+54 9 11 ${String(1000 + i).padStart(4, '0')}-${String(2000 + i).padStart(4, '0')}`,
-    totalServices: Math.max(1, 100 - i),
-    lastVisit: '-'
-  }));*/
 
 rankingList: RankingClienteView[] = [];
 
@@ -129,7 +119,13 @@ paginatedDailyClientsList: Client[] = []; // Lista paginada real
 
 private statsRefreshIntervalId: any = null;
 
-  constructor(private autolavadoService: AutolavadoService, private cdr: ChangeDetectorRef, private http: HttpClient) {}
+  constructor(
+    private autolavadoService: AutolavadoService,
+    private cdr: ChangeDetectorRef,
+    private http: HttpClient,
+    private toastService: ToastService,
+    private confirmService: ConfirmService
+  ) {}
 
 
   ngOnInit(): void {
@@ -234,18 +230,6 @@ private getClientIdentityKey(c: Client): string {
   if (phone) return `phone:${phone}`;
   return `name:${name}`;
 }
-
-/*private getTierByCount(count: number): 'oro' | 'plata' | 'bronce' | 'ninguno' {
-  if (count >= this.TIER_ORO) return 'oro';
-  if (count >= this.TIER_PLATA) return 'plata';
-  if (count >= this.TIER_BRONCE) return 'bronce';
-  return 'ninguno';
-}*/
-
-
-
-
-
 
 
 private buildMonthlyRanking(): RankingClienteView[] {
@@ -473,11 +457,7 @@ get pageNumbersDaily(): number[] {
   return pages;
 }
 
-setPageDaily0(page: number): void {
-  if (page >= 1 && page <= this.totalPagesDaily) {
-    this.currentPageDaily = page;
-  }
-}
+
 
 setPageDaily(page: number): void {
   const totalPages = this.totalPagesDaily;
@@ -514,12 +494,6 @@ getPaymentColor(clientId: string | number | undefined): string | null {
 }
 
 
-
-
-
-
-
-
 getPaymentRowStyle(client: Client): { backgroundColor: string } {
   if (!client?.id) {
     //console.log('getPaymentRowStyle: sin client o id → default');
@@ -546,22 +520,6 @@ getPaymentRowStyle(client: Client): { backgroundColor: string } {
   return { backgroundColor: color };
 }
 
-// Función auxiliar para oscurecer un color (opcional)
-private darkenColor(hex: string, factor: number = 0.2): string {
-  hex = hex.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  return '#' +
-    Math.round(r * (1 - factor)).toString(16).padStart(2, '0') +
-    Math.round(g * (1 - factor)).toString(16).padStart(2, '0') +
-    Math.round(b * (1 - factor)).toString(16).padStart(2, '0');
-}
-
-
-
-
-
 
 acceptEditClient(): void {
   console.log('Botón Guardar cambios pulsado');
@@ -570,13 +528,13 @@ acceptEditClient(): void {
 
   const clientId = this.editingClient.id;
   if (!clientId) {
-    alert('Error: cliente sin ID');
+    this.showErrorToast('Error: cliente sin ID');
     return;
   }
 
   // Validación Clover
   if (this.editForm.clover && !/^\d{4}$/.test(this.editForm.clover)) {
-    alert('El código Clover debe tener exactamente 4 dígitos numéricos');
+    this.toastService.showWarning('El codigo Clover debe tener exactamente 4 digitos numericos.');
     return;
   }
 
@@ -623,7 +581,7 @@ acceptEditClient(): void {
     },
     error: (err) => {
       console.error('Error al actualizar:', err);
-      alert('Error al actualizar');
+      this.showErrorToast('Error al actualizar');
     }
   });
 }
@@ -664,78 +622,6 @@ isClientPaid(client: Client): boolean {
     clover: '',
     metodoPago: 'efectivo'
   };
-}
-
-
-
-
-private calculateStats0(): void {
-  const spacesArray = Object.values(this.spaces);
-
-  // Estadísticas generales (espacios actuales - se mantienen)
-  this.totalSpaces = spacesArray.length;
-  this.occupiedSpaces = spacesArray.filter(s => s.occupied).length;
-  this.freeSpaces = this.totalSpaces - this.occupiedSpaces;
-  this.occupancyRate = this.totalSpaces > 0 ? Math.round((this.occupiedSpaces / this.totalSpaces) * 100) : 0;
-
-  // Por subsuelo (actuales - se mantienen)
-  this.subsueloStats = this.subsuelos.map(sub => {
-    const subSpaces = spacesArray.filter(s => s.subsueloId === sub.id);
-    const subOccupied = subSpaces.filter(s => s.occupied).length;
-    const subTotal = subSpaces.length;
-    const subFree = subTotal - subOccupied;
-    const subOccupancyRate = subTotal > 0 ? Math.round((subOccupied / subTotal) * 100) : 0;
-
-    return {
-      id: sub.id,
-      label: sub.label,
-      total: subTotal,
-      occupied: subOccupied,
-      free: subFree,
-      occupancyRate: subOccupancyRate
-    };
-  });
-
-  // NUEVO: Estadísticas del día completo (basado en dailyClients)
-  const dailyClients = this.dailyClients;
-
-  // Total cobrado del día
-  this.dailyTotalCobrado = dailyClients.reduce((sum, c) => sum + (c.price || 0), 0);
-
-  // Métodos de pago
-  const totalServices = dailyClients.length;
-  const paymentCounts = { efectivo: 0, credito: 0, prepago: 0, qr: 0, otros: 0 };
-
-  dailyClients.forEach(c => {
-    const method = (c.paymentMethod || 'otros').toLowerCase();
-    if (method in paymentCounts) {
-      paymentCounts[method as keyof typeof paymentCounts]++;
-    } else {
-      paymentCounts.otros++;
-    }
-  });
-
-  this.paymentStats = {
-    efectivo: { count: paymentCounts.efectivo, pct: totalServices > 0 ? Math.round((paymentCounts.efectivo / totalServices) * 100) : 0 },
-    credito: { count: paymentCounts.credito, pct: totalServices > 0 ? Math.round((paymentCounts.credito / totalServices) * 100) : 0 },
-    prepago: { count: paymentCounts.prepago, pct: totalServices > 0 ? Math.round((paymentCounts.prepago / totalServices) * 100) : 0 },
-    qr: { count: paymentCounts.qr, pct: totalServices > 0 ? Math.round((paymentCounts.qr / totalServices) * 100) : 0 },
-    otros: { count: paymentCounts.otros, pct: totalServices > 0 ? Math.round((paymentCounts.otros / totalServices) * 100) : 0 }
-  };
-
-  // Distribución por tiempo (basado en entryTimestamp)
-  const now = Date.now();
-  this.timeStats = { under1h: 0, between1h3h: 0, over3h: 0 };
-
-  dailyClients.forEach(c => {
-    if (!c.entryTimestamp) return;
-    const elapsedMs = now - c.entryTimestamp;
-    const elapsedHours = elapsedMs / (3600000);
-
-    if (elapsedHours < 1) this.timeStats.under1h++;
-    else if (elapsedHours <= 3) this.timeStats.between1h3h++;
-    else this.timeStats.over3h++;
-  });
 }
 
 
@@ -866,12 +752,6 @@ private calculateStats(): void {
   });
 }
 
-
-
-
-
-
-
 openEditClient(client: Client): void {
   this.editingClient = client;
 
@@ -899,9 +779,6 @@ openEditClient(client: Client): void {
   }
 
 
-  onSearchClients0(): void {
-  this.currentPageDaily = 1;  // Reinicia a página 1 al buscar
-}
 
 onSearchClients(): void {
   this.currentPageDaily = 1;
@@ -915,43 +792,10 @@ onSearchClients(): void {
   }
 
 
-
-
-
-
-get filteredDailyClients0(): Client[] {
-  if (!this.searchTerm.trim()) {
-    this.filteredDailyClientsList = this.dailyClients;
-  } else {
-    const term = this.searchTerm.toLowerCase();
-    this.filteredDailyClientsList = this.dailyClients.filter(client =>
-      (client.name?.toLowerCase().includes(term)) ||
-      (client.code?.toLowerCase().includes(term)) ||
-      (client.phoneIntl?.includes(term)) ||
-      (client.vehicle?.toLowerCase().includes(term)) ||
-      (client.plate?.toLowerCase().includes(term)) ||
-      (client.dni?.includes(term))
-    );
-  }
-  return this.filteredDailyClientsList;
-}
-
-
 get filteredDailyClients(): Client[] {
   return this.filteredDailyClientsList || [];
 }
 
-
-
-get paginatedDailyClients0(): Client[] {
-  const start = (this.currentPageDaily - 1) * this.pageSizeDaily;
-  this.paginatedDailyClientsList = this.filteredDailyClients.slice(start, start + this.pageSizeDaily);
-  return this.paginatedDailyClientsList;
-}
-
-get totalPagesDaily0(): number {
-  return Math.ceil(this.filteredDailyClients.length / this.pageSizeDaily);
-}
 
 get totalPagesDaily(): number {
   return Math.max(1, Math.ceil((this.filteredDailyClientsList?.length || 0) / this.pageSizeDaily));
@@ -961,12 +805,6 @@ get totalPagesDaily(): number {
 get paginatedDailyClients(): Client[] {
   return this.paginatedDailyClientsList || [];
 }
-
-
-
-
-
-
 
   get totalPages(): number {
     return Math.ceil(this.filteredClients.length / this.pageSize);
@@ -1221,109 +1059,6 @@ private applyDailyClientFiltersAndPagination(): void {
 }
 
 
-
-
-generateAndSaveReport0(isManual: boolean = false): void {
-  const type = isManual ? 'MANUAL' : 'AUTOMATICO';
-  console.log(`%cINICIANDO GENERACION DE REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
-
-  const clientsForReport = this.dailyClients;
-  if (!clientsForReport.length) {
-    if (isManual) alert('No hay clientes para generar el reporte del dia');
-    return;
-  }
-
-  const enrichedClients = this.enrichClientsForReport(clientsForReport);
-  const periodKey = new Date().toISOString().slice(0, 10); // yyyy-MM-dd
-  const reportData = this.buildReportPayload(enrichedClients, 'DAILY', periodKey);
-
-  console.log('[DIARIO] payload reportData:', reportData);
-
-  this.http.post<Report>(`${this.API_BASE}/reports`, reportData).subscribe({
-    next: (savedReport) => {
-      const detailHtml = this.autolavadoService.generateReportDetailHtml({
-        ...reportData,
-        id: savedReport.id,
-        timestamp: savedReport.timestamp,
-        subsueloStats: reportData.subsueloStats,
-        timeStats: reportData.timeStats,
-        filteredClients: reportData.filteredClients,
-        paymentAmounts: reportData.paymentAmounts,
-        totalCobrado: reportData.totalCobrado
-      } as Report);
-
-      const blob = new Blob([detailHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_exellsior_${periodKey}_${isManual ? 'manual' : 'automatico'}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      this.showSuccessToast(isManual ? 'Reporte manual generado y descargado' : 'Reporte diario automatico generado y descargado');
-    },
-    error: (error) => {
-      console.error('Error al generar reporte diario', error);
-      this.showErrorToast('Error al generar el reporte');
-    }
-  });
-}
-
-generateAndSaveReport1(isManual: boolean = false): void {
-  const type = isManual ? 'MANUAL' : 'AUTOMATICO';
-
-  console.log(`%cINICIANDO GENERACION DE REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
-
-  const clientsForReport = this.dailyClients;
-  if (!clientsForReport.length) {
-    if (isManual) alert('No hay clientes para generar el reporte del dia');
-    return;
-  }
-
-  const enrichedClients = this.enrichClientsForReport(clientsForReport);
-
-  const now = new Date();
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  const reportData: any = this.buildReportPayload(enrichedClients, 'DAILY', periodKey);
-  reportData.dailyFinal = false; // manual/auto intermedio
-
-  console.log('[DIARIO] payload reportData:', reportData);
-
-  this.http.post<Report>(`${this.API_BASE}/reports`, reportData).subscribe({
-    next: (savedReport) => {
-      const detailHtml = this.autolavadoService.generateReportDetailHtml({
-        ...reportData,
-        id: savedReport.id,
-        timestamp: savedReport.timestamp,
-        subsueloStats: reportData.subsueloStats,
-        timeStats: reportData.timeStats,
-        filteredClients: reportData.filteredClients,
-        paymentAmounts: reportData.paymentAmounts,
-        totalCobrado: reportData.totalCobrado
-      } as Report);
-
-      const blob = new Blob([detailHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_exellsior_${periodKey}_${isManual ? 'manual' : 'automatico'}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      this.showSuccessToast(isManual ? 'Reporte manual generado (no final)' : 'Reporte diario automatico generado (no final)');
-    },
-    error: (error) => {
-      console.error('Error al generar reporte diario', error);
-      this.showErrorToast('Error al generar el reporte');
-    }
-  });
-}
-
 generateAndSaveReport(isManual: boolean = false): void {
   const type = isManual ? 'MANUAL' : 'AUTOMATICO';
   console.log(`%cINICIANDO GENERACION DE REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
@@ -1361,7 +1096,7 @@ generateAndSaveReport(isManual: boolean = false): void {
 
       // Si no hay nada para reportar ni antes ni ahora
       if (!mergedClients.length) {
-        if (isManual) alert('No hay clientes para generar el reporte del dia');
+        if (isManual) this.toastService.showInfo('No hay clientes para generar el reporte del dia.');
         return of(null);
       }
 
@@ -1545,43 +1280,15 @@ private buildDailyReportPayloadMerged(mergedClients: any[], periodKey: string) {
 // En reports.component.ts - Métodos de Toast (CORREGIDOS)
 
 showSuccessToast(message: string): void {
-  const toast = document.createElement('div');
-  toast.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 p-3';
-  toast.style.zIndex = '9999';
-  toast.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body text-white">
-        ✓ ${message}
-      </div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
-  `;
-  document.body.appendChild(toast);
-
-  const bsToast = new (window as any).bootstrap.Toast(toast, { delay: 4000 });
-  bsToast.show();
-
-  toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  this.toastService.showSuccess(message);
 }
 
 showErrorToast(message: string): void {
-  const toast = document.createElement('div');
-  toast.className = 'toast align-items-center text-bg-danger border-0 position-fixed bottom-0 end-0 p-3';
-  toast.style.zIndex = '9999';
-  toast.innerHTML = `
-    <div class="d-flex">
-      <div class="toast-body text-white">
-        ✗ ${message}
-      </div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
-  `;
-  document.body.appendChild(toast);
+  this.toastService.showError(message);
+}
 
-  const bsToast = new (window as any).bootstrap.Toast(toast, { delay: 5000 });
-  bsToast.show();
-
-  toast.addEventListener('hidden.bs.toast.toast', () => toast.remove());
+showWarningToast(message: string): void {
+  this.toastService.showWarning(message);
 }
 
 getSpaceByKey(spaceKey: string | null): Space | undefined {
@@ -1591,94 +1298,43 @@ getSpaceByKey(spaceKey: string | null): Space | undefined {
 
 
 
-
-eliminarServicio0(client: Client): void {
-  const clientName = client.name || 'este cliente';
-  const vehicle = client.vehicle ? `(${client.vehicle})` : '';
-
-  const confirmDelete = confirm(
-    `¿Estás seguro de ELIMINAR DEFINITIVAMENTE el servicio de ${clientName} ${vehicle}?\n\n` +
-    `Esto borrará el registro del cliente de la base de datos y liberará el espacio si está ocupado.\n` +
-    `No se puede recuperar.`
-  );
-
-  if (!confirmDelete) return;
-
-  console.log(`Eliminando servicio del cliente ID: ${client.id} de la BD`);
-
-  const spaceKey = client.spaceKey;
-  const space = this.getSpaceByKey(spaceKey);
-
-  if (space && space.occupied) {
-    // 1. Si el espacio está ocupado → liberar primero
-    console.log(`Espacio ${spaceKey} ocupado. Liberando antes de eliminar cliente...`);
-
-    this.autolavadoService.releaseSpace(spaceKey).subscribe({
-      next: () => {
-        console.log('Espacio liberado correctamente');
-        delete this.paymentColorsByClientId[client.id.toString()];
-        this.savePaymentColors();
-        // 2. Ahora eliminar el cliente de la BD
-        this.eliminarClienteDeBD(client.id, clientName);
-
-
-
-
-      },
-      error: (err) => {
-        console.error('Error al liberar espacio antes de eliminar:', err);
-        alert('Error al liberar el espacio. El servicio no se eliminó.');
-      }
-    });
-  } else {
-    // Espacio ya liberado → eliminar directamente de la BD
-    this.eliminarClienteDeBD(client.id, clientName);
-  }
+eliminarServicio(client: Client): void {
+  void this.eliminarServicioWithGlobalConfirm(client);
 }
 
-eliminarServicio(client: Client): void {
+private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
   const clientName = client.name || 'este cliente';
   const vehicle = client.vehicle ? `(${client.vehicle})` : '';
 
-  const confirmDelete = confirm(
-    `¿Estás seguro de ELIMINAR DEFINITIVAMENTE el servicio de ${clientName} ${vehicle}?\n\n` +
-    `Esto borrará el registro del cliente de la base de datos y liberará el espacio si está ocupado.\n` +
-    `No se puede recuperar.`
-  );
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar servicio',
+    message:
+      `Eliminar definitivamente el servicio de ${clientName} ${vehicle}?\n\n` +
+      `Se liberara el espacio si esta ocupado y el registro no se podra recuperar.`,
+    confirmText: 'Eliminar servicio',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
 
-  if (!confirmDelete) return;
-
-  console.log(`Eliminando servicio del cliente ID: ${client.id}`);
+  if (!confirmed) {
+    return;
+  }
 
   const spaceKey = client.spaceKey;
   const space = this.getSpaceByKey(spaceKey);
 
-  // Función interna para eliminar de BD y actualizar UI
   const deleteFromBDAndUpdateUI = () => {
     this.autolavadoService.deleteClientFromBackend(client.id).subscribe({
       next: () => {
-        console.log(`Cliente ${client.id} eliminado correctamente`);
-
-        // Eliminar color persistente
         delete this.paymentColorsByClientId[client.id.toString()];
         this.savePaymentColors();
-        console.log('Color eliminado para cliente', client.id);
-
-        // Actualizar lista en memoria (eliminar el cliente eliminado)
         this.dailyClients = this.dailyClients.filter(c => c.id !== client.id);
-
-       delete this.paymentColorsByClientId[client.id.toString()];
-  this.savePaymentColors();
-
-  // Recargar listas (sin método inexistente)
-  this.filteredDailyClientsList = this.dailyClients.filter(c => c.id !== client.id);
-  this.paginatedDailyClientsList = this.filteredDailyClientsList.slice(
-    (this.currentPageDaily - 1) * this.pageSizeDaily,
-    (this.currentPageDaily - 1) * this.pageSizeDaily + this.pageSizeDaily
-  );
-        // Forzar renderizado
+        this.filteredDailyClientsList = this.dailyClients.filter(c => c.id !== client.id);
+        this.paginatedDailyClientsList = this.filteredDailyClientsList.slice(
+          (this.currentPageDaily - 1) * this.pageSizeDaily,
+          (this.currentPageDaily - 1) * this.pageSizeDaily + this.pageSizeDaily
+        );
         this.cdr.detectChanges();
-
         this.showSuccessToast(`Servicio de ${clientName} eliminado correctamente`);
       },
       error: (err) => {
@@ -1689,41 +1345,18 @@ eliminarServicio(client: Client): void {
   };
 
   if (space && space.occupied) {
-    console.log(`Espacio ${spaceKey} ocupado. Liberando primero...`);
     this.autolavadoService.releaseSpace(spaceKey).subscribe({
-      next: () => {
-        console.log('Espacio liberado correctamente');
-        deleteFromBDAndUpdateUI();
-      },
+      next: () => deleteFromBDAndUpdateUI(),
       error: (err) => {
         console.error('Error al liberar espacio', err);
-        alert('Error al liberar el espacio. El servicio no se eliminó.');
+        this.showErrorToast('Error al liberar el espacio. El servicio no se elimino.');
       }
     });
-  } else {
-    // Espacio ya libre → eliminar directamente
-    deleteFromBDAndUpdateUI();
+    return;
   }
+
+  deleteFromBDAndUpdateUI();
 }
-
-
-private eliminarClienteDeBD(clientId: number, clientName: string): void {
-  this.autolavadoService.deleteClientFromBackend(clientId).subscribe({
-    next: () => {
-      console.log(`Cliente ${clientId} (${clientName}) eliminado correctamente de la BD`);
-      // No necesitas hacer nada más: deleteClientFromBackend ya recarga spaces y clients
-      // La tabla se actualiza sola porque dailyClients$ depende de clients$
-      this.showSuccessToast(`Servicio de ${clientName} eliminado correctamente`);
-    },
-    error: (err) => {
-      console.error('Error al eliminar cliente de la BD:', err);
-      this.showErrorToast('Error al eliminar el servicio. Intenta de nuevo.');
-    }
-  });
-}
-
-
-
 
 
 
@@ -1747,7 +1380,7 @@ generateReport(): void {
   this.http.post<any>(`${this.API_BASE}/reports`, reportData).pipe(
     catchError(error => {
       console.error('Error saving report to backend', error);
-      alert('Reporte descargado localmente, pero error al guardar en backend: ' + error.message);
+      this.showWarningToast('Reporte descargado localmente, pero hubo un error al guardarlo en backend: ' + error.message);
       return of(null);
     })
   ).subscribe(response => {
@@ -1907,43 +1540,13 @@ generateReport(): void {
 }
 
 
-private toMillis(value: any): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'number') return isNaN(value) ? null : value;
-  if (typeof value === 'string') {
-    const ms = new Date(value).getTime();
-    return isNaN(ms) ? null : ms;
-  }
-  return null;
-}
-
-/*private getClientEventTs(client: Client): number | null {
-  return this.toMillis(client.entryTimestamp) ?? this.toMillis(client.exitTimestamp);
-}*/
-
-private getMonthlyClientsForReport(referenceDate: Date = new Date()): Client[] {
-  const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1).getTime();
-  const nextMonthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1).getTime();
-
-  return Object.values(this.clients || {})
-    .filter(c => {
-      const ts = this.getClientEventTs(c);
-      return ts !== null && ts >= monthStart && ts < nextMonthStart;
-    })
-    .sort((a, b) => (this.getClientEventTs(b) || 0) - (this.getClientEventTs(a) || 0));
-}
-
-
-
 private toEpoch(value: any): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = typeof value === 'number' ? value : new Date(value).getTime();
   return isNaN(n) ? null : n;
 }
 
-private getClientEventTs(c: Client): number | null {
-  return this.toEpoch(c.entryTimestamp) ?? this.toEpoch(c.exitTimestamp);
-}
+
 
 private enrichClientsForReport(clients: Client[]): any[] {
   return clients.map(client => {
@@ -2012,21 +1615,6 @@ trackByPageNumber(index: number, page: number): number {
 }
 
 
-
-//actualizacion
-
-private isDailyReportOfMonth(report: Report, monthKey: string): boolean {
-  const tsMonth = (report.timestamp || '').slice(0, 7);
-  if (tsMonth !== monthKey) return false;
-
-  if (report.periodType === 'MONTHLY') return false;
-  if (report.periodType === 'DAILY') return true;
-
-  // Compatibilidad con reportes viejos sin periodType
-  if (report.periodKey) return report.periodKey.length === 10; // yyyy-MM-dd => diario
-  return true; // legacy sin periodKey: asumimos diario
-}
-
 private parseJsonArraySafe(value?: string): any[] {
   if (!value) return [];
   try {
@@ -2054,183 +1642,8 @@ private getReportTotalCobrado(report: Report): number {
   return Object.values(pa).reduce((sum, v) => sum + (Number(v) || 0), 0);
 }
 
-private buildMonthlyPayloadFromDailyReports(dailyReports: Report[], monthKey: string) {
-  const paymentTotals: Record<string, number> = {
-    efectivo: 0,
-    credito: 0,
-    prepago: 0,
-    qr: 0,
-    debito: 0,
-    scaneo: 0,
-    'S/Cargo': 0,
-    otros: 0
-  };
-
-  const mergedTimeStats = {
-    under1h: 0,
-    between1h3h: 0,
-    over3h: 0
-  };
-
-  const allClientsRaw = dailyReports.flatMap(r => this.parseJsonArraySafe(r.filteredClients));
-
-  // Evitar duplicados por id+code+entry+exit
-  const dedup = new Map<string, any>();
-  allClientsRaw.forEach(c => {
-    const key = `${c?.id ?? 'x'}|${c?.code ?? 'x'}|${c?.entryTimestamp ?? 'x'}|${c?.exitTimestamp ?? 'x'}`;
-    if (!dedup.has(key)) dedup.set(key, c);
-  });
-  const mergedClients = Array.from(dedup.values());
-
-  dailyReports.forEach(r => {
-    const pa = this.parseJsonObjectSafe<Record<string, number>>(r.paymentAmounts);
-    Object.keys(paymentTotals).forEach((k) => {
-      paymentTotals[k] += Number(pa[k] || 0);
-    });
-
-    const ts = this.parseJsonObjectSafe<Record<string, number>>(r.timeStats);
-    mergedTimeStats.under1h += Number(ts['under1h'] || 0);
-    mergedTimeStats.between1h3h += Number(ts['between1h3h'] || 0);
-    mergedTimeStats.over3h += Number(ts['over3h'] || 0);
-  });
-
-  const totalCobrado = dailyReports.reduce((sum, r) => sum + this.getReportTotalCobrado(r), 0);
-
-  // Tomamos estructura base del último diario del mes
-  const latest = dailyReports[dailyReports.length - 1];
-
-  return {
-    timestamp: new Date().toISOString(),
-    periodType: 'MONTHLY' as const,
-    periodKey: monthKey,
-    totalSpaces: latest?.totalSpaces ?? this.totalSpaces,
-    occupiedSpaces: latest?.occupiedSpaces ?? this.occupiedSpaces,
-    freeSpaces: latest?.freeSpaces ?? this.freeSpaces,
-    occupancyRate: latest?.occupancyRate ?? this.occupancyRate,
-    subsueloStats: latest?.subsueloStats ?? JSON.stringify(this.subsueloStats),
-    timeStats: JSON.stringify(mergedTimeStats),
-    filteredClients: JSON.stringify(mergedClients),
-    paymentAmounts: JSON.stringify(paymentTotals),
-    totalCobrado
-  };
-}
 
 
-generateAndSaveMonthlyReport0(isManual: boolean = true): void {
-  const type = isManual ? 'MENSUAL-MANUAL' : 'MENSUAL-AUTO';
-  const now = new Date();
-  const monthKey = now.toISOString().slice(0, 7); // yyyy-MM
-  const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  const runDateLabel = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  console.log(`%cINICIANDO REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
-  console.log('[MENSUAL] monthKey:', monthKey);
-
-  this.http.get<Report[]>(`${this.API_BASE}/reports`).subscribe({
-    next: (allReports) => {
-      const dailyReports = allReports
-        .filter((r) => this.isDailyReportOfMonth(r, monthKey))
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-      console.log('[MENSUAL] reportes diarios encontrados:', dailyReports.length);
-      console.table(
-        dailyReports.map(r => ({
-          id: r.id,
-          periodType: r.periodType || '(legacy)',
-          periodKey: r.periodKey || '(none)',
-          timestamp: r.timestamp,
-          totalCobrado: r.totalCobrado
-        }))
-      );
-
-      if (!dailyReports.length) {
-        console.warn('[MENSUAL] No hay reportes diarios del mes para consolidar.');
-        if (isManual) alert(`No hay reportes diarios en ${monthLabel} para generar el mensual.`);
-        return;
-      }
-
-      const reportData = this.buildMonthlyPayloadFromDailyReports(dailyReports, monthKey);
-      console.log('[MENSUAL] payload consolidado:', reportData);
-
-      this.http.post<Report>(`${this.API_BASE}/reports`, reportData).subscribe({
-        next: (savedReport) => {
-          const detailHtml = this.autolavadoService.generateReportDetailHtml(
-            {
-              ...reportData,
-              id: savedReport.id,
-              timestamp: savedReport.timestamp
-            } as Report,
-            {
-              periodLabel: 'Servicios del mes',
-              periodDateLabel: `${monthLabel} hasta ${runDateLabel}`
-            }
-          );
-
-          const blob = new Blob([detailHtml], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `reporte_mensual_exellsior_${monthKey}.html`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          this.showSuccessToast(`Reporte mensual generado (${monthLabel})`);
-        },
-        error: (error) => {
-          console.error('[MENSUAL] Error guardando reporte mensual', error);
-          this.showErrorToast('Error al guardar el reporte mensual');
-        }
-      });
-    },
-    error: (error) => {
-      console.error('[MENSUAL] Error cargando reportes para consolidar', error);
-      this.showErrorToast('Error al leer reportes diarios para el mensual');
-    }
-  });
-}
-
-generateAndSaveMonthlyReport1(isManual: boolean = true): void {
-  const type = isManual ? 'MENSUAL-MANUAL' : 'MENSUAL-AUTO';
-  const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  const runDateLabel = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  console.log(`%cINICIANDO REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
-  console.log('[MENSUAL] monthKey:', monthKey);
-
-  this.http.post<Report>(`${this.API_BASE}/reports/monthly/generate?month=${monthKey}`, {}).subscribe({
-    next: (savedReport) => {
-      console.log('[MENSUAL] Reporte mensual generado en backend', savedReport);
-
-      const detailHtml = this.autolavadoService.generateReportDetailHtml(
-        savedReport as Report,
-        {
-          periodLabel: 'Servicios del mes',
-          periodDateLabel: `${monthLabel} hasta ${runDateLabel}`
-        }
-      );
-
-      const blob = new Blob([detailHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte_mensual_exellsior_${monthKey}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      this.showSuccessToast(`Reporte mensual generado (${monthLabel})`);
-    },
-    error: (error) => {
-      console.error('[MENSUAL] Error generando reporte mensual', error);
-      this.showErrorToast('Error al generar el reporte mensual');
-    }
-  });
-}
 
 generateAndSaveMonthlyReport(isManual: boolean = true): void {
   const type = isManual ? 'MENSUAL-MANUAL' : 'MENSUAL-AUTO';

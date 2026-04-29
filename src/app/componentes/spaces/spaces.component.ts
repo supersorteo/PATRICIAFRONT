@@ -22,6 +22,14 @@ interface ClientVehicleItem {
   //price?: number;
 }
 
+interface TransferSubsueloOption {
+  id: string;
+  label: string;
+  totalSpaces: number;
+  occupiedSpaces: number;
+  freeSpaces: number;
+}
+
 @Component({
   selector: 'app-spaces',
   standalone: true,
@@ -105,6 +113,10 @@ private activeClientVehiclesKey: string | null = null;
   whatsappMessageOccupied = '';
   whatsappMessageOccupied0 = '';
   hasCopiedMessageOccupied = false;
+  showTransferSpaceModal = false;
+  isSubmittingTransferSpace = false;
+  selectedTransferSubsueloId = '';
+  transferSubsueloOptions: TransferSubsueloOption[] = [];
   sentReleaseWhatsappBySpace = new Set<string>();
   private readonly WHATSAPP_SENT_KEY = 'exellsior_whatsapp_sent_';
   private readonly WHATSAPP_SENT_STORAGE_KEY = 'exellsior_whatsapp_sent_spaces';
@@ -329,7 +341,7 @@ this.uiRefreshIntervalId = setInterval(() => {
     },
     error: (err) => {
       console.error('Error al cargar vehículos', err);
-      alert('No se pudieron cargar los tipos de vehículos');
+      this.toastService.showError('No se pudieron cargar los tipos de vehiculos.');
     }
   });
 
@@ -466,12 +478,6 @@ ngAfterViewInit(): void {
       });
   }, 0);
 }
-
-
-
-
-
-
 
 
 
@@ -629,30 +635,6 @@ private getIdentityKeyForClient(c: Client): string {
 
 
 
-
-getMonthlyServiceCountForClient0(client: Client): number {
-  const key = this.getIdentityKeyForClient(client);
-  if (!key) return 0;
-
-  if (!this.monthlyServiceCountByKey.has(key)) {
-    this.loadMonthlyServiceCountForClient(client);
-    return 0; // temporal mientras responde backend
-  }
-
-  return this.monthlyServiceCountByKey.get(key) ?? 0;
-}
-
-
-getMonthlyServiceCountForClient1(client: Client): number {
-  const dni = (client?.dni || '').toString().trim();
-  if (!dni) return 0;
-
-  // Lazy batch preload (puede dispararse varias veces, pero el método ya se protege)
-  this.preloadMonthlyServiceCountsForClients(this.filteredClientsAdmin || this.allClients || []);
-
-  return this.monthlyServiceCountByDni.get(dni) ?? 0;
-}
-
 getMonthlyServiceCountForClient(client: Client): number {
   this.ensureMonthlyServiceCountCacheForCurrentMonth();
 
@@ -728,58 +710,7 @@ private loadMonthlyServiceCountForClient(client: Client): void {
 }
 
 
-private preloadMonthlyServiceCountsForClients0(clients: Client[]): void {
-  if (this.monthlyServiceCountBatchLoading) return;
 
-  const dnis = Array.from(new Set(
-    (clients || [])
-      .map(c => (c?.dni || '').toString().trim())
-      .filter(Boolean)
-  ));
-
-  if (!dnis.length) return;
-
-  // Pedir solo los que faltan en cache
-  const missing = dnis.filter(dni => !this.monthlyServiceCountByDni.has(dni));
-  if (!missing.length) return;
-
-  this.monthlyServiceCountBatchLoading = true;
-
-  const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  this.autolavadoService.getMonthlyServiceCountsByDnis(missing, monthKey).subscribe({
-    next: (counts) => {
-      Object.entries(counts || {}).forEach(([dni, count]) => {
-        this.monthlyServiceCountByDni.set(dni, Number(count || 0));
-      });
-
-      // Si backend no devolvió alguno, dejar 0
-      missing.forEach(dni => {
-        if (!this.monthlyServiceCountByDni.has(dni)) {
-          this.monthlyServiceCountByDni.set(dni, 0);
-        }
-      });
-
-      this.monthlyServiceCountBatchLoading = false;
-
-      console.log('[MonthlyCount][batch] loaded', {
-        monthKey,
-        requested: missing.length,
-        received: Object.keys(counts || {}).length
-      });
-
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      this.monthlyServiceCountBatchLoading = false;
-      console.warn('[MonthlyCount][batch] error', err);
-
-      // fallback cache 0 para evitar reintentos infinitos
-      missing.forEach(dni => this.monthlyServiceCountByDni.set(dni, 0));
-    }
-  });
-}
 
 private preloadMonthlyServiceCountsForClients(clients: Client[]): void {
   this.ensureMonthlyServiceCountCacheForCurrentMonth();
@@ -925,22 +856,7 @@ openNewClientModal() {
 }
 
 
-openNewClientModal0() {
-  this.newClientForm.reset();
-  this.newPhoneIsValid = false;
-  this.newPhoneFlag = '';
-  this.newPhoneCode = '';
-  this.newPhoneCountry = '';
-  if (this.newIti) {
-    this.newIti.setCountry('ar');
-    this.newIti.setNumber('');
-  }
-  this.showNewClientModal = true;
 
-  // Si usás Bootstrap modal
-  const modal = new bootstrap.Modal(document.getElementById('newClientModal'));
-  modal.show();
-}
 
 openVehicleAsideForManual() {
   this.isVehicleAsideFromManual = true; // Bandera para saber desde dónde se abrió
@@ -951,51 +867,6 @@ openVehicleAsideForManual() {
 
 
 
-selectVehicle0(v: VehicleType) {
-  // Cargar en el formulario (tu lógica actual)
-  if (this.isVehicleAsideFromManual) {
-    // Desde modal de nuevo cliente manual (si aplica)
-    this.newClientForm.patchValue({
-      vehicle: v.model,
-      category: v.category,
-      price: v.price
-    });
-  } else {
-    // Desde modal de reserva de espacio
-    this.clientForm.patchValue({
-      vehicle: v.model,
-      category: v.category,
-      price: v.price
-    });
-  }
-
-  // NUEVO: Agregar automáticamente al store de vehículos del cliente (si no existe ya)
-  const key = this.getCurrentClientVehiclesKey();
-  if (key !== `space:${this.selectedSpaceKey || 'temp'}`) { // solo si hay DNI o nombre
-    const currentList = this.clientVehiclesStore[key] || [];
-
-    // Verificar si ya existe (por modelo)
-    const exists = currentList.some(item => item.model.toLowerCase() === v.model.toLowerCase());
-    if (!exists) {
-      const newVehicle: ClientVehicleItem = {
-        model: v.model,
-        plate: this.clientForm.get('plate')?.value?.trim() || '',
-
-        notes: '',
-
-      };
-      currentList.push(newVehicle);
-      this.clientVehiclesStore[key] = currentList;
-      console.log(`Vehículo "${v.model}" agregado al store del cliente (${key})`);
-    }
-  }
-
-  // Cerrar aside
-  this.closeVehicleAside();
-  this.isVehicleAsideFromManual = false;
-
-  this.toastService.showSuccess(`Vehículo seleccionado: ${v.model} - $${v.price}`);
-}
 
 
 selectVehicle(v: VehicleType) {
@@ -1042,7 +913,7 @@ selectVehicle(v: VehicleType) {
 
 
 
-saveNewClient() {
+async saveNewClient() {
   this.newClientForm.markAllAsTouched();
 
   if (this.newClientForm.invalid || !this.newPhoneIsValid) {
@@ -1069,12 +940,27 @@ saveNewClient() {
     clientVehicles   // <-- en vez de vehicleTypes
   };
 
+  const confirmed = await this.confirmService.confirm({
+    title: 'Crear cliente manual',
+    message:
+      `Crear cliente manual "${this.newClientForm.value.name}" con el vehiculo "${this.newClientForm.value.vehicle}"?`,
+    confirmText: 'Crear cliente',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (!confirmed) {
+    this.toastService.showInfo('Creacion de cliente cancelada.');
+    this.isSavingNewClient = false;
+    return;
+  }
+
   this.isSavingNewClient = true;
 
   this.autolavadoService.addManualClient(clientData).subscribe({
     next: (savedClient) => {
       this.isSavingNewClient = false;
-      alert('Cliente agregado correctamente');
+      this.toastService.showSuccess('Cliente agregado correctamente.');
 
       const modalElement = document.getElementById('newClientModal');
       if (modalElement) {
@@ -1105,7 +991,7 @@ saveNewClient() {
     },
     error: (err) => {
       this.isSavingNewClient = false;
-      alert('Error al guardar: ' + (err.error?.message || 'Intenta de nuevo'));
+      this.toastService.showError('Error al guardar: ' + (err.error?.message || 'Intenta de nuevo'));
     }
   });
 }
@@ -1222,7 +1108,7 @@ private loadDataFromBackend(): void {
     },
     error: (err) => {
       console.error('Error cargando datos desde backend', err);
-      alert('No hay conexión. Usando datos locales si existen...');
+      this.toastService.showWarning('No hay conexion. Se usaran datos locales si existen.');
     }
   });
 }
@@ -1240,7 +1126,7 @@ openVehicleAside(): void {
   // Si ya tiene 4 vehículos, mostrar error y no abrir
   const total = this.clientVehiclesList?.length || 0;
   if (total >= 4) {
-    alert('Solo se permiten hasta 4 vehículos por cliente.');
+    this.toastService.showWarning('Solo se permiten hasta 4 vehiculos por cliente.');
     return;
   }
 
@@ -1279,15 +1165,25 @@ closeVehicleAside(): void {
   this.isVehicleAsideFromManual = false;
 }
 
-onVehicleInput(event: Event): void {
+async onVehicleInput(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const typed = input.value.trim();
 
   if (typed && !this.vehicles.some(v => v.model.toLowerCase() === typed.toLowerCase())) {
     // Si escribió algo que no existe → ofrecer agregar
-    if (confirm(`"${typed}" no existe. ¿Agregar como nuevo?`)) {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Agregar vehiculo',
+      message: `"${typed}" no existe en el catalogo. Deseas agregarlo ahora?`,
+      confirmText: 'Agregar vehiculo',
+      cancelText: 'Cancelar',
+      variant: 'primary'
+    });
+
+    if (confirmed) {
       this.newVehicleModel = typed;
       this.showAddVehicleModal = true;
+    } else {
+      input.value = '';
     }
   }
 }
@@ -1434,12 +1330,7 @@ get showFrequentClientButton(): boolean {
   return this.frequentClientMonthlyVisitsCount > 3;
 }
 
-openFrequentClientModal0(): void {
-  const visits = this.getVisitsForCurrentClientThisMonth();
-  if (visits.length <= 3) return;
-  this.frequentClientVisitsSnapshot = visits;
-  this.showFrequentClientModal = true;
-}
+
 
 openFrequentClientModal(): void {
   this.autolavadoService.getAllClientsFromBackend().subscribe({
@@ -1477,26 +1368,7 @@ closeFrequentClientModal(): void {
   this.showFrequentClientModal = false;
 }
 
-private getCurrentClientVehiclesKey0 (): string {
-  const dni = (this.clientForm.get('dni')?.value || '').toString().trim();
-  const name = (this.clientForm.get('name')?.value || '').toString().trim().toLowerCase();
 
-  if (dni) return `dni:${dni}`;
-  if (name) return `name:${name}`;
-  return `space:${this.selectedSpaceKey || 'temp'}`;
-}
-
-private getCurrentClientVehiclesKey1(): string {
-  const dni = (this.clientForm.get('dni')?.value || '').toString().trim();
-  const name = (this.clientForm.get('name')?.value || '').toString().trim().toLowerCase();
-
-  if (dni) return `dni:${dni}`;
-  if (name) return `name:${name}`;
-
-  // Fallback: timestamp + espacio + random corto (casi imposible colisión)
-  const random = Math.random().toString(36).substring(2, 6);
-  return `temp:${Date.now()}-${this.selectedSpaceKey || 'unknown'}-${random}`;
-}
 
 
 private getCurrentClientVehiclesKey(): string {
@@ -1518,15 +1390,7 @@ private getCurrentClientVehiclesKey(): string {
 
 
 
-private persistCurrentClientVehicles0(): void {
-  const key = this.activeClientVehiclesKey || this.getCurrentClientVehiclesKey();
 
-  if (this.clientVehiclesList.length === 0) {
-    delete this.clientVehiclesStore[key];
-    return;
-  }
-  this.clientVehiclesStore[key] = this.clientVehiclesList.map(v => ({ ...v }));
-}
 
 private persistCurrentClientVehicles(): void {
   const key = this.activeClientVehiclesKey || this.getCurrentClientVehiclesKey();
@@ -1552,86 +1416,7 @@ private persistCurrentClientVehicles(): void {
 }
 
 
-private syncClientVehiclesListToBackend0(reason: 'save' | 'delete'): void {
-  const dni = (this.clientForm.get('dni')?.value || '').toString().trim();
 
-  // Sin DNI => no hay forma segura de asociar en backend (queda como draft local)
-  if (!dni) {
-    console.log('[Vehicles] sync backend omitido (sin DNI). Se mantiene draft local.', { reason });
-    return;
-  }
-
-  // Construir payload desde lista actual
-  let clientVehiclesPayload: Array<{ vehicleType: { id: number }; plate: string; notes: string }> = [];
-  try {
-    clientVehiclesPayload = this.buildClientVehiclesPayload();
-  } catch (e: any) {
-    console.error('[Vehicles] Error construyendo payload para sync backend', e);
-    alert(e?.message || 'Error preparando vehículos para sincronizar');
-    return;
-  }
-
-  console.log('[Vehicles] Sync backend -> buscando cliente por DNI', {
-    reason,
-    dni,
-    payload: clientVehiclesPayload
-  });
-
-  this.fetchReservationsByDni$(dni).pipe(
-    map((reservations) => this.sortReservationsDesc(reservations)),
-    switchMap((rows) => {
-      if (!rows.length) {
-        console.log('[Vehicles] No hay reservas en backend para ese DNI. Se mantiene draft local.', { dni, reason });
-        return of(null);
-      }
-
-      const latestClient = rows[0];
-      console.log('[Vehicles] Sync backend -> actualizar clientVehicles en cliente', {
-        reason,
-        dni,
-        clientId: latestClient.id,
-        latestReservationId: latestClient.id
-      });
-
-      return this.autolavadoService.updateClientInBackend(latestClient.id, {
-        clientVehicles: clientVehiclesPayload
-      });
-    })
-  ).subscribe({
-    next: (updatedClient) => {
-      if (!updatedClient) return;
-
-      // Rehidratar lista desde backend (fuente real)
-      this.clientVehiclesList = this.mapClientVehiclesFromBackend(updatedClient);
-      this.persistCurrentClientVehicles();
-
-      // Si el vehículo seleccionado en el form coincide, refrescar plate/notes del form
-      const currentVehicle = (this.clientForm.get('vehicle')?.value || '').toString().trim();
-      const matched = this.clientVehiclesList.find(v =>
-        this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(currentVehicle)
-      );
-
-      if (matched) {
-        this.clientForm.patchValue({
-          plate: matched.plate || '',
-          notes: matched.notes || ''
-        }, { emitEvent: false });
-      }
-
-      console.log('[Vehicles] Sync backend OK', {
-        reason,
-        clientId: updatedClient.id,
-        vehicles: this.clientVehiclesList
-      });
-
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      console.error('[Vehicles] Error sincronizando clientVehicles en backend', { reason, dni, err });
-      alert('No se pudieron sincronizar los vehículos del cliente en el backend.');
-    }
-  });
-}
 
 
 private syncClientVehiclesListToBackend(
@@ -1734,33 +1519,7 @@ private normalizeVehicleModel(model: string | null | undefined): string {
   return (model || '').toString().trim().toLowerCase();
 }
 
-private upsertClientVehicleInList0(item: ClientVehicleItem): void {
-  const modelNorm = this.normalizeVehicleModel(item.model);
-  if (!modelNorm) return;
 
-  const idx = this.clientVehiclesList.findIndex(v =>
-    this.normalizeVehicleModel(v.model) === modelNorm
-  );
-
-  const normalizedItem: ClientVehicleItem = {
-    model: (item.model || '').toString().trim(),
-    plate: (item.plate || '').toString().trim(),
-    notes: (item.notes || '').toString().trim()
-  };
-
-  if (idx >= 0) {
-    this.clientVehiclesList[idx] = normalizedItem;
-    return;
-  }
-
-
-
-  if (this.clientVehiclesList.length >= 4) {
-    throw new Error('Solo se permiten hasta 4 vehículos por cliente.');
-  }
-
-  this.clientVehiclesList.push(normalizedItem);
-}
 
 
 private upsertClientVehicleInList(item: ClientVehicleItem): void {
@@ -1826,73 +1585,7 @@ private clearClientVehicleWorkingList(): void {
 
 
 
-openClientVehiclesModal0(): void {
-  const dni = (this.clientForm.get('dni')?.value || '').toString().trim();
 
-  this.clearClientVehicleEditorState();
-
-  // Sin DNI: trabajar con buffer local + vehículo actual del formulario
-  if (!dni) {
-    try {
-      if (!Array.isArray(this.clientVehiclesList)) {
-        this.clientVehiclesList = [];
-      }
-
-      this.syncCurrentFormVehicleIntoClientVehiclesList();
-
-      console.log('[Vehículos modal] Sin DNI, usando buffer local/form actual', {
-        vehicles: this.clientVehiclesList
-      });
-
-      this.showClientVehiclesModal = true;
-    } catch (e: any) {
-      alert(e?.message || 'Error preparando vehículos del cliente');
-    }
-    return;
-  }
-
-  // Con DNI: backend-first
-  this.fetchReservationsByDni$(dni).subscribe({
-    next: (reservations) => {
-      const rows = this.sortReservationsDesc(reservations);
-      const latest = rows[0];
-
-      // Resetear buffer de trabajo y cargar desde backend
-      this.clientVehiclesList = latest ? this.mapClientVehiclesFromBackend(latest) : [];
-
-      // Merge del vehículo actual del formulario (no persistido aún)
-      try {
-        this.syncCurrentFormVehicleIntoClientVehiclesList();
-      } catch (e: any) {
-        alert(e?.message || 'Error preparando vehículos del cliente');
-        return;
-      }
-
-      console.log('[Vehículos modal] cargados desde backend + merge form', {
-        dni,
-        reservations: rows.length,
-        latestClientId: latest?.id || null,
-        vehicles: this.clientVehiclesList
-      });
-
-      this.showClientVehiclesModal = true;
-    },
-    error: (err) => {
-      console.error('Error cargando vehículos desde backend', err);
-
-      // Fallback de UX: usar buffer/form actual
-      try {
-        if (!Array.isArray(this.clientVehiclesList)) {
-          this.clientVehiclesList = [];
-        }
-        this.syncCurrentFormVehicleIntoClientVehiclesList();
-        this.showClientVehiclesModal = true;
-      } catch (e: any) {
-        alert(e?.message || 'No se pudieron cargar los vehículos del cliente');
-      }
-    }
-  });
-}
 
 
 openClientVehiclesModal(): void {
@@ -1998,12 +1691,7 @@ openClientVehiclesModal(): void {
 
 
 
-closeClientVehiclesModal0(): void {
-  this.showClientVehiclesModal = false;
-  this.clientVehicleEditor = { model: '', plate: '', notes: '' };
-  this.editingClientVehicleIndex = null;
-  this.activeClientVehiclesKey = null; // liberar la clave
-}
+
 
 closeClientVehiclesModal(): void {
   if (this.isSyncingClientVehicles) {
@@ -2024,110 +1712,9 @@ closeClientVehiclesModal(): void {
 
 
 
-saveClientVehicleItem0(): void {
-  const model = (this.clientVehicleEditor.model || '').trim();
-  if (!model) {
-    alert('Debes ingresar el modelo del vehículo.');
-    return;
-  }
-
-  const payload: ClientVehicleItem = {
-    model,
-    plate: (this.clientVehicleEditor.plate || '').trim(),
-    notes: (this.clientVehicleEditor.notes || '').trim()
-  };
-
-  // Snapshot para rollback local si backend falla
-  const before = (this.clientVehiclesList || []).map(v => ({ ...v }));
-
-  try {
-    if (this.editingClientVehicleIndex !== null) {
-      const original = this.clientVehiclesList[this.editingClientVehicleIndex];
-      if (!original) return;
-
-      // Mantener modelo original al editar
-      payload.model = original.model;
-      this.clientVehiclesList[this.editingClientVehicleIndex] = payload;
-    } else {
-      // upsert + límite 4
-      this.upsertClientVehicleInList(payload);
-    }
-
-    this.persistCurrentClientVehicles();
-
-    console.log('[Vehicles] saveClientVehicleItem -> lista local actualizada', {
-      editingIndex: this.editingClientVehicleIndex,
-      savedItem: payload,
-      list: this.clientVehiclesList
-    });
-
-    // Limpiar editor local
-    this.clientVehicleEditor = { model: '', plate: '', notes: '' };
-    this.editingClientVehicleIndex = null;
-
-    // Sync backend con rollback local si falla
-    this.syncClientVehiclesListToBackend('save', before);
-
-  } catch (e: any) {
-    this.clientVehiclesList = before.map(v => ({ ...v }));
-    this.persistCurrentClientVehicles();
-
-    console.error('[Vehicles] Error guardando item local', e);
-    alert(e?.message || 'Error al guardar vehículo');
-  }
-}
 
 
-saveClientVehicleItem01(): void {
-  this.withClientVehiclesSyncLock(() => {
-    const model = (this.clientVehicleEditor.model || '').trim();
-    if (!model) {
-      this.setClientVehiclesModalError('Debes ingresar el modelo del vehículo.');
-      return;
-    }
 
-    this.setClientVehiclesModalError('');
-
-    const payload: ClientVehicleItem = {
-      model,
-      plate: (this.clientVehicleEditor.plate || '').trim(),
-      notes: (this.clientVehicleEditor.notes || '').trim()
-    };
-
-    const before = (this.clientVehiclesList || []).map(v => ({ ...v }));
-
-    try {
-      if (this.editingClientVehicleIndex !== null) {
-        const original = this.clientVehiclesList[this.editingClientVehicleIndex];
-        if (!original) return;
-
-        payload.model = original.model;
-        this.clientVehiclesList[this.editingClientVehicleIndex] = payload;
-      } else {
-        this.upsertClientVehicleInList(payload);
-      }
-
-      this.persistCurrentClientVehicles();
-
-      console.log('[Vehicles] saveClientVehicleItem -> lista local actualizada', {
-        editingIndex: this.editingClientVehicleIndex,
-        savedItem: payload,
-        list: this.clientVehiclesList
-      });
-
-      this.clearClientVehicleEditorState();
-
-      this.syncClientVehiclesListToBackend('save', before);
-
-    } catch (e: any) {
-      this.clientVehiclesList = before.map(v => ({ ...v }));
-      this.persistCurrentClientVehicles();
-
-      console.error('[Vehicles] Error guardando item local', e);
-      this.setClientVehiclesModalError(e?.message || 'Error al guardar vehículo');
-    }
-  });
-}
 
 saveClientVehicleItem(): void {
   this.withClientVehiclesSyncLock(() => {
@@ -2185,12 +1772,7 @@ saveClientVehicleItem(): void {
 
 
 
-editClientVehicleItem0(index: number): void {
-  const item = this.clientVehiclesList[index];
-  if (!item) return;
-  this.clientVehicleEditor = { ...item };
-  this.editingClientVehicleIndex = index;
-}
+
 
 
 editClientVehicleItem(index: number): void {
@@ -2219,53 +1801,25 @@ editClientVehicleItem(index: number): void {
 
 
 
-deleteClientVehicleItem0(index: number): void {
+
+
+async deleteClientVehicleItem(index: number): Promise<void> {
   const item = this.clientVehiclesList[index];
   if (!item) return;
 
-  if (!confirm(`¿Eliminar el vehículo "${item.model}"?`)) return;
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar vehiculo del cliente',
+    message: `Eliminar el vehiculo "${item.model}" de la lista del cliente?`,
+    confirmText: 'Eliminar',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
 
-  const before = (this.clientVehiclesList || []).map(v => ({ ...v }));
+  if (!confirmed) return;
 
-  try {
-    this.clientVehiclesList.splice(index, 1);
-    this.persistCurrentClientVehicles();
-
-    if (this.editingClientVehicleIndex === index) {
-      this.clientVehicleEditor = { model: '', plate: '', notes: '' };
-      this.editingClientVehicleIndex = null;
-    } else if (
-      this.editingClientVehicleIndex !== null &&
-      this.editingClientVehicleIndex > index
-    ) {
-      this.editingClientVehicleIndex = this.editingClientVehicleIndex - 1;
-    }
-
-    console.log('[Vehicles] deleteClientVehicleItem -> lista local actualizada', {
-      deletedIndex: index,
-      deletedItem: item,
-      list: this.clientVehiclesList
-    });
-
-    // Sync backend con rollback local si falla
-    this.syncClientVehiclesListToBackend('delete', before);
-
-  } catch (e: any) {
-    this.clientVehiclesList = before.map(v => ({ ...v }));
-    this.persistCurrentClientVehicles();
-
-    console.error('[Vehicles] Error eliminando item local', e);
-    alert(e?.message || 'Error al eliminar vehículo');
-  }
-}
-
-
-deleteClientVehicleItem(index: number): void {
   this.withClientVehiclesSyncLock(() => {
-    const item = this.clientVehiclesList[index];
-    if (!item) return;
-
-    if (!confirm(`¿Eliminar el vehículo "${item.model}"?`)) return;
+    const currentItem = this.clientVehiclesList[index];
+    if (!currentItem) return;
 
     this.setClientVehiclesModalError('');
 
@@ -2348,8 +1902,15 @@ clearSearchClients(): void {
 
 
 
-exportClientsDbToExcel(): void {
-  const confirmed = confirm('¿Deseas exportar la base de datos de clientes a Excel?');
+async exportClientsDbToExcel(): Promise<void> {
+  const confirmed = await this.confirmService.confirm({
+    title: 'Exportar clientes',
+    message: 'Deseas exportar la base de datos de clientes a Excel?',
+    confirmText: 'Exportar',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
   if (!confirmed) return;
 
   const rows = this.allClients || [];
@@ -2385,8 +1946,15 @@ exportClientsDbToExcel(): void {
 
 
 
-exportAllUniqueClientsDbToExcel(): void {
-  const confirmed = confirm('Deseas exportar la base de datos de clientes a Excel?');
+async exportAllUniqueClientsDbToExcel(): Promise<void> {
+  const confirmed = await this.confirmService.confirm({
+    title: 'Exportar clientes',
+    message: 'Deseas exportar la base de datos de clientes a Excel?',
+    confirmText: 'Exportar',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
   if (!confirmed) return;
 
   this.autolavadoService.getUniqueClientsFromBackend().subscribe({
@@ -2418,27 +1986,12 @@ exportAllUniqueClientsDbToExcel(): void {
     },
     error: (err) => {
       console.error('Error exportando clientes', err);
-      alert('No se pudo exportar la base de datos de clientes');
+      this.toastService.showError('No se pudo exportar la base de datos de clientes');
     }
   });
 }
 
-loadAllClientsFromBackend0(): void {
-  this.autolavadoService.getAllClientsFromBackend().subscribe({
-    next: (clients) => {
-      const uniqueClients = this.dedupeClientsForUI(clients);
 
-      this.allClients = uniqueClients;
-      this.filteredClientsAdmin = uniqueClients;
-
-      console.log('Clientes únicos cargados desde backend (dedupe frontend):', uniqueClients);
-    },
-    error: (err) => {
-      console.error('Error cargando clientes', err);
-      alert('No se pudieron cargar los clientes');
-    }
-  });
-}
 
 
 
@@ -2502,7 +2055,7 @@ loadAllClientsFromBackend00(): void {
     },
     error: (err) => {
       console.error('Error cargando clientes', err);
-      alert('No se pudieron cargar los clientes');
+      this.toastService.showError('No se pudieron cargar los clientes.');
     }
   });
 }
@@ -2521,7 +2074,7 @@ loadAllClientsFromBackend(): void {
     },
     error: (err) => {
       console.error('Error cargando clientes', err);
-      alert('No se pudieron cargar los clientes');
+      this.toastService.showError('No se pudieron cargar los clientes.');
     }
   });
 }
@@ -2558,7 +2111,7 @@ loadClientsAdminPageFromBackend(): void {
     },
     error: (err) => {
       console.error('Error cargando clientes', err);
-      alert('No se pudieron cargar los clientes');
+      this.toastService.showError('No se pudieron cargar los clientes.');
     },
     complete: () => {
       this.isLoadingClientsAdmin = false;
@@ -2660,7 +2213,7 @@ getTimeInSpace(startTime: number | null): string {
 }
 
 editClient(client: Client): void {
-  alert(`Función editar cliente ID ${client.id} - Puedes implementar un formulario aquí`);
+  this.toastService.showInfo(`Edicion de cliente ID ${client.id} pendiente de implementar.`, 4500);
   console.log('Editar cliente:', client);
   // Aquí puedes abrir otro modal con formulario para editar
 }
@@ -2668,39 +2221,7 @@ editClient(client: Client): void {
 
 
 deleteClient(clientId: any): void {
-  if (confirm(`¿Eliminar cliente ID ${clientId}? Esto liberará el espacio que ocupa (si lo tiene).`)) {
-    console.log('Iniciando eliminación del cliente ID:', clientId);
-    const shouldGoPreviousPage = this.filteredClientsAdmin.length === 1 && this.clientsAdminPage > 0;
-
-    this.autolavadoService.deleteClientFromBackend(clientId).subscribe({
-      next: () => {
-        console.log(`Cliente ${clientId} eliminado correctamente`);
-
-        // El modal usa una vista paginada/deduplicada; hay que recargarla explícitamente.
-        if (shouldGoPreviousPage) {
-          this.clientsAdminPage -= 1;
-        }
-        this.loadClientsAdminPageFromBackend();
-        this.filterSpaces();
-        this.cdr.detectChanges();
-
-        this.toastService.showSuccess('Cliente eliminado correctamente');
-      },
-      error: (err) => {
-        console.error('Error eliminando cliente', err);
-        if (err?.status === 404) {
-          if (shouldGoPreviousPage) {
-            this.clientsAdminPage -= 1;
-          }
-          this.loadClientsAdminPageFromBackend();
-          this.toastService.showError('El cliente ya no existía en el servidor. La lista fue recargada.');
-          return;
-        }
-
-        this.toastService.showError('Error al eliminar cliente');
-      }
-    });
-  }
+  void this.deleteClientWithConfirm(clientId);
 }
 
 
@@ -2825,7 +2346,30 @@ private filterSpaces(): void {
   }
 
   addSubsuelo(): void {
-    this.autolavadoService.addSubsuelo();
+    void this.addSubsueloWithConfirm();
+  }
+
+  private async addSubsueloWithConfirm(): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Crear subsuelo',
+      message: 'Se agregara un nuevo subsuelo vacio al sistema. Deseas continuar?',
+      confirmText: 'Crear subsuelo',
+      cancelText: 'Cancelar',
+      variant: 'primary'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      this.autolavadoService.addSubsuelo();
+      this.filterSpaces();
+      this.cdr.detectChanges();
+      this.toastService.showSuccess('Subsuelo agregado correctamente.');
+    } catch (error: any) {
+      this.toastService.showError('No se pudo agregar el subsuelo: ' + (error?.message || error));
+    }
   }
 
 
@@ -2839,22 +2383,75 @@ editSubsuelo(): void {
 }
 
 confirmEditSubsuelo(): void {
-  if (this.editedSubsueloLabel.trim() && this.currentSubId) {
-    try {
-      this.autolavadoService.updateSubsuelo(this.currentSubId, this.editedSubsueloLabel);
-      this.filterSpaces(); // Actualizar vista
-      this.cdr.detectChanges();
-      alert('Subsuelo actualizado exitosamente!');
-    } catch (error) {
-      alert('Error al actualizar subsuelo: ' + error);
-    }
+  void this.confirmEditSubsueloWithConfirm();
+}
+
+private async confirmEditSubsueloWithConfirm(): Promise<void> {
+  const trimmedLabel = this.editedSubsueloLabel.trim();
+  if (!trimmedLabel || !this.currentSubId) {
+    this.toastService.showWarning('Ingresa un nombre valido para el subsuelo.');
+    return;
   }
-  this.hideModal('editSubsueloModal');
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Guardar subsuelo',
+    message: `Actualizar el nombre del subsuelo ${this.currentSubId} a "${trimmedLabel}"?`,
+    confirmText: 'Guardar cambios',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    this.autolavadoService.updateSubsuelo(this.currentSubId, trimmedLabel);
+    this.filterSpaces();
+    this.cdr.detectChanges();
+    this.hideModal('editSubsueloModal');
+    this.toastService.showSuccess('Subsuelo actualizado correctamente.');
+  } catch (error: any) {
+    this.toastService.showError('Error al actualizar subsuelo: ' + (error?.message || error));
+  }
 }
 
 
   addSpaces(): void {
-    this.autolavadoService.addSpacesToCurrent(this.addSpacesCount);
+    void this.addSpacesWithConfirm();
+  }
+
+  private async addSpacesWithConfirm(): Promise<void> {
+    if (!this.currentSubId) {
+      this.toastService.showWarning('Selecciona un subsuelo antes de agregar espacios.');
+      return;
+    }
+
+    if (!this.addSpacesCount || this.addSpacesCount < 1) {
+      this.toastService.showWarning('La cantidad de espacios a agregar debe ser mayor que cero.');
+      return;
+    }
+
+    const confirmed = await this.confirmService.confirm({
+      title: 'Agregar espacios',
+      message: `Agregar ${this.addSpacesCount} espacios al subsuelo ${this.currentSubId}?`,
+      confirmText: 'Agregar espacios',
+      cancelText: 'Cancelar',
+      variant: 'primary'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      this.autolavadoService.addSpacesToCurrent(this.addSpacesCount);
+      this.filterSpaces();
+      this.cdr.detectChanges();
+      this.toastService.showSuccess(`${this.addSpacesCount} espacios agregados correctamente.`);
+    } catch (error: any) {
+      this.toastService.showError('No se pudieron agregar los espacios: ' + (error?.message || error));
+    }
   }
 
 
@@ -2957,208 +2554,9 @@ private updateOccupiedModal(client: Client | null, space: Space): void {
 
 
 
-
-
-saveClient0(): void {
-  if (this.clientForm.invalid || !this.phoneIsValid) {
-    alert('Por favor, completa todos los campos obligatorios correctamente.\n\nVerifica que el teléfono sea válido.');
-    Object.keys(this.clientForm.controls).forEach(key => {
-      this.clientForm.get(key)?.markAsTouched();
-    });
-    return;
-  }
-
-  try {
-    const selectedVehicleModel = (this.clientForm.value.vehicle || '').toString().trim();
-    const selectedVehicle = this.vehicles.find(v => v.model === selectedVehicleModel);
-
-    const category = selectedVehicle?.category || 'AUTO';
-    const price = this.clientForm.value.price || selectedVehicle?.price || 35000;
-
-    const phoneIntl = (this.clientForm.value.phone || '').toString();
-    const phoneRaw = phoneIntl.replace(/^\+\d+/, '') || '';
-    const dni = (this.clientForm.value.dni || '').toString().trim();
-
-    const conflict = this.findActiveVehicleReservationConflict(dni, selectedVehicleModel);
-    if (conflict) {
-      alert(
-        `No se puede reservar el mismo vehículo en dos espacios al mismo tiempo.\n\n` +
-        `Vehículo: ${selectedVehicleModel}\n` +
-        `DNI: ${dni}\n` +
-        `Reserva activa en: ${conflict.spaceKey || 'espacio desconocido'}`
-      );
-      return;
-    }
-
-    try {
-  this.syncCurrentFormVehicleIntoClientVehiclesList();
-} catch (e: any) {
-  alert(e?.message || 'Error al preparar vehículos del cliente');
-  return;
-}
-
-
-    // Asegurar que el vehículo actual del formulario esté en la lista (máx 4)
-    const currentModel = (this.clientForm.get('vehicle')?.value || '').toString().trim();
-    const currentPlate = (this.clientForm.get('plate')?.value || '').toString().trim();
-    const currentNotes = (this.clientForm.get('notes')?.value || '').toString().trim();
-
-    if (currentModel) {
-      const idx = this.clientVehiclesList.findIndex(
-        v => this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(currentModel)
-      );
-
-      const currentItem: ClientVehicleItem = {
-        model: currentModel,
-        plate: currentPlate,
-        notes: currentNotes
-      };
-
-      if (idx >= 0) {
-        this.clientVehiclesList[idx] = currentItem;
-      } else {
-        if (this.clientVehiclesList.length >= 4) {
-          alert('Solo se permiten hasta 4 vehículos por cliente.');
-          return;
-        }
-        this.clientVehiclesList.push(currentItem);
-      }
-    }
-
-    // Snapshot para rollback si backend falla
-    const spacesBefore = JSON.parse(JSON.stringify(this.autolavadoService.spacesSubject.value));
-    const clientsBefore = JSON.parse(JSON.stringify(this.autolavadoService.clientsSubject.value));
-
-    const localClientData = {
-      ...this.clientForm.value,
-      category,
-      price,
-      phoneIntl,
-      phoneRaw,
-      entryTimestamp: Date.now(),
-      exitTimestamp: null
-    };
-
-    // Guardado local optimista
-    const localClient = this.autolavadoService.saveClient(localClientData, this.selectedSpaceKey);
-    const space = this.spaces[this.selectedSpaceKey];
-
-    this.whatsappMessage = this.autolavadoService.buildWhatsAppMessage(localClient, space);
-    this.whatsappLink = this.autolavadoService.buildWhatsAppLink(localClient, space);
-    this.hasCopiedMessage = false;
-
-    const clientVehicles = this.clientVehiclesList
-      .map(item => {
-        const vt = this.vehicles.find(v => v.model.toLowerCase() === (item.model || '').toLowerCase());
-        if (!vt) return null;
-        return {
-          vehicleType: { id: vt.id },
-          plate: item.plate || '',
-          notes: item.notes || ''
-        };
-      })
-      .filter(Boolean);
-
-    const payload = {
-      id: this.existingClientId || null,
-      name: localClient.name,
-      dni: localClient.dni || '',
-      phoneRaw: localClient.phoneRaw,
-      phoneIntl: localClient.phoneIntl,
-      code: localClient.code,
-      vehicle: localClient.vehicle,
-      plate: localClient.plate,
-      notes: localClient.notes,
-      category: localClient.category,
-      price: localClient.price,
-      clientVehicles
-    };
-
-    console.log('[clientVehiclesList]', this.clientVehiclesList);
-    console.log('[clientVehicles payload]', clientVehicles);
-    console.log('Datos enviados al backend:', payload);
-
-    this.autolavadoService.saveClientToBackend({
-      spaceKey: this.selectedSpaceKey,
-      payload
-    }).subscribe({
-      next: (serverClient) => {
-        console.log('Cliente reservado/actualizado en backend:', serverClient);
-
-        const tempId = localClient.id;
-        const realId = serverClient.id.toString();
-
-        const clientsMap = { ...this.autolavadoService.clientsSubject.value };
-
-        if (clientsMap[tempId]) {
-          const clientToMove = {
-            ...clientsMap[tempId],
-            ...serverClient,
-            id: realId
-          };
-          delete clientsMap[tempId];
-          clientsMap[realId] = clientToMove;
-        } else {
-          clientsMap[realId] = { ...(serverClient as any), id: realId };
-        }
-
-        this.autolavadoService.clientsSubject.next(clientsMap);
-
-        // Asegurar que el espacio local apunte al ID real
-        const spacesMap = { ...this.autolavadoService.spacesSubject.value };
-        if (spacesMap[this.selectedSpaceKey]) {
-          spacesMap[this.selectedSpaceKey] = {
-            ...spacesMap[this.selectedSpaceKey],
-            clientId: realId
-          };
-        }
-
-        this.autolavadoService.spacesSubject.next(spacesMap);
-        this.autolavadoService.saveAll();
-
-        // Mantener referencias del componente sincronizadas
-        this.spaces = spacesMap;
-        this.clients = clientsMap;
-
-        this.filterSpaces();
-        this.cdr.detectChanges();
-
-        //this.refreshClientReservationsFromBackendByDni(localClient.dni || '');
-        this.refreshClientReservationsFromBackendByDni(serverClient.dni || localClient.dni || '');
-
-
-
-        alert('Cliente guardado exitosamente!');
-        this.openWhatsApp();
-      },
-      error: (err) => {
-        console.error('Error en backend al reservar. Aplicando rollback local...', err);
-
-        // Rollback del estado local
-        this.autolavadoService.spacesSubject.next(spacesBefore);
-        this.autolavadoService.clientsSubject.next(clientsBefore);
-        this.autolavadoService.saveAll();
-
-        // Sincronizar referencias del componente
-        this.spaces = { ...spacesBefore };
-        this.clients = { ...clientsBefore };
-        this.filterSpaces();
-        this.cdr.detectChanges();
-
-        alert('No se pudo guardar en backend. Se revirtió la reserva local.');
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Error:', error);
-    alert(error?.message || 'Error al guardar cliente');
-  }
-}
-
-
 saveClient(): void {
   if (this.clientForm.invalid || !this.phoneIsValid) {
-    alert('Por favor, completa todos los campos obligatorios correctamente.\n\nVerifica que el teléfono sea válido.');
+    this.toastService.showWarning('Completa los campos obligatorios y verifica que el telefono sea valido.');
     Object.keys(this.clientForm.controls).forEach(key => {
       this.clientForm.get(key)?.markAsTouched();
     });
@@ -3166,7 +2564,7 @@ saveClient(): void {
   }
 
   if (!this.selectedSpaceKey) {
-    alert('No hay espacio seleccionado.');
+    this.toastService.showWarning('No hay espacio seleccionado.');
     return;
   }
 
@@ -3184,15 +2582,28 @@ saveClient(): void {
     try {
       this.syncCurrentFormVehicleIntoClientVehiclesList();
     } catch (e: any) {
-      alert(e?.message || 'Error al preparar vehículos del cliente');
+      this.toastService.showError(e?.message || 'Error al preparar los vehiculos del cliente.');
       return;
     }
 
     // 3) Validación backend (consistencia real)
     this.validateVehicleConflictWithBackend$(ctx.dni, ctx.selectedVehicleModel).subscribe({
-      next: (backendConflict) => {
+      next: async (backendConflict) => {
         if (backendConflict) {
           this.showVehicleConflictAlert(ctx.selectedVehicleModel, ctx.dni, backendConflict.spaceKey, true);
+          return;
+        }
+
+        const confirmed = await this.confirmService.confirm({
+          title: 'Confirmar reserva',
+          message: `Reservar espacio ${this.selectedSpaceKey} para el DNI ${ctx.dni} con el vehiculo ${ctx.selectedVehicleModel}?`,
+          confirmText: 'Reservar',
+          cancelText: 'Cancelar',
+          variant: 'primary'
+        });
+
+        if (!confirmed) {
+          this.toastService.showInfo('Reserva cancelada.');
           return;
         }
 
@@ -3201,13 +2612,13 @@ saveClient(): void {
       },
       error: (err) => {
         console.error('[CONFLICT] Error validando conflicto en backend', err);
-        alert('No se pudo validar conflicto de reserva. Intenta nuevamente.');
+        this.toastService.showError('No se pudo validar el conflicto de reserva. Intenta nuevamente.');
       }
     });
 
   } catch (error: any) {
     console.error('Error en saveClient:', error);
-    alert(error?.message || 'Error al guardar cliente');
+    this.toastService.showError(error?.message || 'Error al guardar el cliente.');
   }
 }
 
@@ -3220,7 +2631,9 @@ private buildReservationContextFromForm(): {
   phoneIntl: string;
   phoneRaw: string;
   dni: string;
-} {
+}
+
+{
   const selectedVehicleModel = (this.clientForm.value.vehicle || '').toString().trim();
   const selectedVehicle = this.vehicles.find(v => v.model === selectedVehicleModel);
 
@@ -3261,13 +2674,13 @@ private showVehicleConflictAlert(
   spaceKey: string | null,
   fromBackend: boolean
 ): void {
-  const origin = fromBackend ? 'Conflicto detectado en backend' : 'No se puede reservar el mismo vehículo en dos espacios al mismo tiempo';
+  const origin = fromBackend
+    ? 'Conflicto detectado en backend.'
+    : 'No se puede reservar el mismo vehiculo en dos espacios al mismo tiempo.';
 
-  alert(
-    `${origin}.\n\n` +
-    `Vehículo: ${vehicleModel}\n` +
-    `DNI: ${dni}\n` +
-    `Reserva activa en: ${spaceKey || 'espacio desconocido'}`
+  this.toastService.showWarning(
+    `${origin} Vehiculo: ${vehicleModel}. DNI: ${dni}. Reserva activa en: ${spaceKey || 'espacio desconocido'}.`,
+    6500
   );
 }
 
@@ -3495,7 +2908,7 @@ private finalizeReservationSuccess(localClient: Client, serverClient: Client): v
   // Rehidratación final desde backend (fuente de verdad)
   this.refreshClientReservationsFromBackendByDni(serverClient.dni || localClient.dni || '');
 
-  alert('Cliente guardado exitosamente!');
+  this.toastService.showSuccess('Reserva guardada correctamente. Ya puedes copiar o abrir el mensaje de WhatsApp.');
   this.openWhatsApp();
 }
 
@@ -3518,7 +2931,7 @@ private handleReservationError(
   this.filterSpaces();
   this.cdr.detectChanges();
 
-  alert(userMessage);
+  this.toastService.showError(userMessage);
 }
 
 
@@ -3656,10 +3069,10 @@ private handleReservationsByDniResult(reservations: Client[]): void {
 
   if (isInactive) {
     this.existingClientId = client.id;
-    alert(`Cliente encontrado: ${client.name}\nSe reutilizará su información (sin reserva activa).`);
+    this.toastService.showInfo(`Cliente encontrado: ${client.name}. Se reutilizara su informacion sin reserva activa.`, 5000);
   } else {
     this.existingClientId = null;
-    alert(`Cliente encontrado: ${client.name}\nYa tiene una reserva activa.\nSe creará una NUEVA reserva para otro vehículo.`);
+    this.toastService.showWarning(`Cliente encontrado: ${client.name}. Ya tiene una reserva activa y se creara una nueva reserva para otro vehiculo.`, 5500);
   }
 
   this.hydrateClientFormFromReservation(client);
@@ -3854,15 +3267,27 @@ onVehicleSelected(event: Event): void {
     console.log('Vehículo existente seleccionado:', selectedVehicle.model);
   } else {
     // Vehículo NO existe → ofrecer agregar nuevo
-    if (confirm(`El modelo "${selectedModel}" no existe. ¿Quieres agregarlo ahora?`)) {
-      this.newVehicleModel = selectedModel; // Prellenar con lo que escribió
-      this.showNewVehicleModal = true;
-    } else {
-      // Si no quiere agregar, limpiar selección
-      select.value = '';
-      this.clientForm.patchValue({ vehicle: '', price: 0 });
-    }
+    void this.confirmUnknownVehicleSelection(selectedModel, select);
   }
+}
+
+private async confirmUnknownVehicleSelection(selectedModel: string, select: HTMLSelectElement): Promise<void> {
+  const confirmed = await this.confirmService.confirm({
+    title: 'Agregar vehiculo',
+    message: `El modelo "${selectedModel}" no existe. Quieres agregarlo ahora?`,
+    confirmText: 'Agregar vehiculo',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (confirmed) {
+    this.newVehicleModel = selectedModel;
+    this.showNewVehicleModal = true;
+    return;
+  }
+
+  select.value = '';
+  this.clientForm.patchValue({ vehicle: '', price: 0 });
 }
 
 
@@ -3870,7 +3295,7 @@ onVehicleSelected(event: Event): void {
 
 saveNewVehicle(): void {
   if (!this.newVehicleModel.trim()) {
-    alert('Debes ingresar un modelo');
+    this.toastService.showWarning('Debes ingresar un modelo de vehiculo.');
     return;
   }
 
@@ -3898,7 +3323,7 @@ saveNewVehicle(): void {
     },
     error: (err) => {
       console.error('Error creando vehículo:', err);
-      alert('Error al agregar el vehículo');
+      this.toastService.showError('Error al agregar el vehiculo.');
     }
   });
 }
@@ -3927,19 +3352,27 @@ updatePriceFromCategory(): void {
 }
 
 
-deleteVehicle(id: number, event: Event): void {
+async deleteVehicle(id: number, event: Event): Promise<void> {
   event.stopPropagation(); // Evita que se seleccione la fila al pulsar eliminar
 
-  if (!confirm('¿Eliminar este tipo de vehículo permanentemente?')) return;
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar vehiculo',
+    message: 'Eliminar este tipo de vehiculo permanentemente?',
+    confirmText: 'Eliminar vehiculo',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
+
+  if (!confirmed) return;
 
   this.autolavadoService.deleteVehicleType(id).subscribe({
     next: () => {
       this.vehicles = this.vehicles.filter(v => v.id !== id);
-      this.toastService.showSuccess('Vehículo eliminado');
+      this.toastService.showSuccess('Vehiculo eliminado.');
     },
     error: (err) => {
-      alert('Error al eliminar vehículo');
       console.error(err);
+      this.toastService.showError('Error al eliminar el vehiculo.');
     }
   });
 }
@@ -3986,23 +3419,17 @@ closeWhatsAppModal(): void {
 copyMessage0(): void {
   navigator.clipboard.writeText(this.whatsappMessage).then(() => {
     this.hasCopiedMessage = true;
-    alert('Mensaje copiado al portapapeles');
+    this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   });
 }
 
 copyMessage(): void {
   navigator.clipboard.writeText(this.whatsappMessage).then(() => {
     this.hasCopiedMessage = true;
-    // Activar toast
-    const toastEl = document.getElementById('copyToast');
-    if (toastEl) {
-      const toast = new bootstrap.Toast(toastEl);
-      toast.show();
-    }
+    this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   }).catch(err => {
     console.error('Error copying message:', err);
-    // Fallback alert si clipboard falla
-    alert('Error al copiar mensaje');
+    this.toastService.showError('No se pudo copiar el mensaje.');
   });
 }
 
@@ -4082,7 +3509,7 @@ openWhatsApp1(): void {
       // window.open(this.whatsappLink, '_blank', 'noopener,noreferrer');
     }, 100);
   } else {
-    alert('No se pudo generar el link de WhatsApp');
+    this.toastService.showWarning('No se pudo generar el link de WhatsApp.');
   }
 }
 
@@ -4142,9 +3569,21 @@ toggleOccupiedQR(): void {
 
 
 
-releaseSpace(): void {
-  if (confirm(`¿Liberar espacio ${this.selectedSpace?.displayName || this.selectedSpaceKey}?`)) {
-    this.autolavadoService.releaseSpace(this.selectedSpaceKey).subscribe({
+async releaseSpace(): Promise<void> {
+  const displayName = this.selectedSpace?.displayName || this.selectedSpaceKey;
+  const confirmed = await this.confirmService.confirm({
+    title: 'Liberar espacio',
+    message: `Liberar espacio ${displayName}?`,
+    confirmText: 'Liberar',
+    cancelText: 'Cancelar',
+    variant: 'warning'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  this.autolavadoService.releaseSpace(this.selectedSpaceKey).subscribe({
       next: () => {
         console.log('Espacio liberado y datos sincronizados');
 
@@ -4154,11 +3593,11 @@ releaseSpace(): void {
           this.saveSentWhatsappState(); // Actualizar persistencia
         }
 
-        // Si había cliente, generar mensaje de liberación y abrir modal
+        // Si habia cliente, generar mensaje de liberacion y abrir modal
         if (this.selectedClient) {
           this.whatsappMessageOccupied = this.autolavadoService.buildWhatsAppMessageRelease(this.selectedClient);
           this.hasCopiedMessageOccupied = false;
-          this.showWhatsAppModalOccupied = true;  // ← ABRIR MODAL AUTOMÁTICAMENTE
+          this.showWhatsAppModalOccupied = true;
         }
 
 
@@ -4167,15 +3606,14 @@ releaseSpace(): void {
         this.hideModal('occupiedModal');
 
 
-        alert('Espacio liberado correctamente');
+        this.toastService.showSuccess('Espacio liberado correctamente');
       },
       error: (err) => {
         console.warn('Error liberando espacio', err);
-        alert('Liberado localmente. Se sincronizará con conexión.');
         this.hideModal('occupiedModal');
+        this.toastService.showWarning('Espacio liberado localmente. Se sincronizara cuando vuelva la conexion.');
       }
     });
-  }
 }
 
 
@@ -4323,13 +3761,28 @@ cerrarDia(): void {
 
 
  deleteSpace(): void {
-    if (confirm(`¿Eliminar espacio ${this.selectedSpaceKey}?`)) {
-      try {
-        this.autolavadoService.deleteSpace(this.selectedSpaceKey);
-        this.hideModal('clientModal');
-      } catch (error) {
-        alert('Error al eliminar espacio: ' + error);
-      }
+    void this.deleteSpaceWithConfirm();
+  }
+
+  private async deleteSpaceWithConfirm(): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Eliminar espacio',
+      message: `Eliminar espacio ${this.selectedSpaceKey}? Esta accion no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      this.autolavadoService.deleteSpace(this.selectedSpaceKey);
+      this.hideModal('clientModal');
+      this.toastService.showSuccess('Espacio eliminado correctamente.');
+    } catch (error: any) {
+      this.toastService.showError('No se pudo eliminar el espacio: ' + (error?.message || error));
     }
   }
 
@@ -4337,25 +3790,72 @@ cerrarDia(): void {
 
 
 deleteSubsuelo(): void {
-  if (this.currentSubId && confirm(`¿Eliminar subsuelo ${this.currentSubId}?`)) {
-    try {
-      this.autolavadoService.deleteSubsuelo(this.currentSubId);
-    } catch (error) {
-      alert('Error al eliminar subsuelo: ' + error);
-    }
+  void this.deleteSubsueloWithConfirm();
+}
+
+private async deleteSubsueloWithConfirm(): Promise<void> {
+  if (!this.currentSubId) {
+    this.toastService.showWarning('Selecciona un subsuelo para eliminar.');
+    return;
+  }
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar subsuelo',
+    message: `Eliminar subsuelo ${this.currentSubId}? Esta accion no se puede deshacer.`,
+    confirmText: 'Eliminar subsuelo',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    this.autolavadoService.deleteSubsuelo(this.currentSubId);
+    this.filterSpaces();
+    this.cdr.detectChanges();
+    this.toastService.showSuccess('Subsuelo eliminado correctamente.');
+  } catch (error: any) {
+    this.toastService.showError('Error al eliminar subsuelo: ' + (error?.message || error));
   }
 }
 
 deleteSpaces(): void {
-  if (this.currentSubId && confirm(`¿Eliminar ${this.addSpacesCount} espacios del subsuelo ${this.currentSubId}?`)) {
-    try {
-      this.autolavadoService.deleteSpacesFromCurrent(this.addSpacesCount);
-      this.filterSpaces();
-      this.cdr.detectChanges();
-      this.currentPage = 1;
-    } catch (error) {
-      alert('Error al eliminar espacios: ' + error);
-    }
+  void this.deleteSpacesWithConfirm();
+}
+
+private async deleteSpacesWithConfirm(): Promise<void> {
+  if (!this.currentSubId) {
+    this.toastService.showWarning('Selecciona un subsuelo para eliminar espacios.');
+    return;
+  }
+
+  if (!this.addSpacesCount || this.addSpacesCount < 1) {
+    this.toastService.showWarning('La cantidad de espacios a eliminar debe ser mayor que cero.');
+    return;
+  }
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar espacios',
+    message: `Eliminar ${this.addSpacesCount} espacios del subsuelo ${this.currentSubId}?`,
+    confirmText: 'Eliminar espacios',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    this.autolavadoService.deleteSpacesFromCurrent(this.addSpacesCount);
+    this.filterSpaces();
+    this.cdr.detectChanges();
+    this.currentPage = 1;
+    this.toastService.showSuccess(`${this.addSpacesCount} espacios eliminados correctamente.`);
+  } catch (error: any) {
+    this.toastService.showError('Error al eliminar espacios: ' + (error?.message || error));
   }
 }
 
@@ -4403,65 +3903,142 @@ editSpace(space: Space): void {
 
 
 confirmEditSpace(): void {
+  void this.confirmEditSpaceWithConfirm();
+}
+
+private async confirmEditSpaceWithConfirm(): Promise<void> {
   console.log('confirmEditSpace ejecutado', { newSpaceKey: this.newSpaceKey, selectedSpaceKey: this.selectedSpaceKey, editedSpace: this.editedSpace });
 
-  if (this.editedSpace) { // Siempre intentar guardar si hay datos
-    let hasError = false;
-    if (this.newSpaceKey !== this.selectedSpaceKey) { // Validar solo si la clave cambió
-      const pattern = /^SUB\d+-[A-Za-z0-9]+$/;
-      if (!pattern.test(this.newSpaceKey)) {
-        console.log('Patrón inválido');
-        alert('La clave debe seguir el patrón SUBN-XXX (donde XXX son letras o números).');
-        hasError = true;
-      }
-    }
-    if (!hasError) {
-      try {
-        console.log('Llamando al servicio editSpace');
-        this.autolavadoService.editSpace(this.selectedSpaceKey, this.newSpaceKey, this.editedSpace);
-        console.log('Servicio exitoso, actualizando vista');
-        this.filterSpaces();
-        this.cdr.detectChanges();
-        console.log('Vista actualizada, alert mostrado');
-        alert('Espacio editado exitosamente!');
-      } catch (error) {
-        console.error('Error en confirmEditSpace:', error);
-        alert('Error al editar espacio: ' + error);
-      }
-    }
-  } else {
-    console.log('No hay datos para editar');
+  if (!this.editedSpace) {
+    this.toastService.showWarning('No hay datos del espacio para editar.');
+    return;
   }
-  this.hideModal('editSpaceModal');
+
+  if (this.newSpaceKey !== this.selectedSpaceKey) {
+    const pattern = /^SUB\d+-[A-Za-z0-9]+$/;
+    if (!pattern.test(this.newSpaceKey)) {
+      console.log('Patron invalido');
+      this.toastService.showWarning('La clave debe seguir el patron SUBN-XXX donde XXX son letras o numeros.');
+      return;
+    }
+  }
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Guardar cambios del espacio',
+    message: `Guardar cambios para el espacio ${this.selectedSpaceKey}?`,
+    confirmText: 'Guardar cambios',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    console.log('Llamando al servicio editSpace');
+    this.autolavadoService.editSpace(this.selectedSpaceKey, this.newSpaceKey, this.editedSpace);
+    console.log('Servicio exitoso, actualizando vista');
+    this.filterSpaces();
+    this.cdr.detectChanges();
+    this.hideModal('editSpaceModal');
+    this.toastService.showSuccess('Espacio editado correctamente.');
+  } catch (error: any) {
+    console.error('Error en confirmEditSpace:', error);
+    this.toastService.showError('Error al editar espacio: ' + (error?.message || error));
+  }
 }
 
 
 
 transferSpace(): void {
-  if (confirm(`¿Transferir espacio ${this.selectedSpaceKey} a otro subsuelo?`)) {
-    const newSubsuelo = prompt('Ingresa el ID del subsuelo destino (ej. SUB2):', '');
-    if (newSubsuelo && newSubsuelo !== this.selectedSpace?.subsueloId) {
-      try {
-        // Transferir localmente (tu lógica actual)
-        this.autolavadoService.transferSpace(this.selectedSpaceKey, newSubsuelo);
+  const currentSubsueloId = this.selectedSpace?.subsueloId || null;
 
-        // Transferir en backend
-        this.autolavadoService.transferSpaceInBackend(this.selectedSpaceKey, newSubsuelo).subscribe({
-          next: () => {
-            console.log('Espacio transferido en backend');
-            this.filterSpaces();
-            this.cdr.detectChanges();
-            alert('Espacio transferido exitosamente!');
-          },
-          error: (err) => {
-            console.warn('Error transferiendo en backend (funciona offline)', err);
-            alert('Transferido localmente. Se sincronizará cuando haya conexión.');
-          }
-        });
-      } catch (error: any) {
-        alert('Error al transferir espacio: ' + error.message);
+  if (!this.selectedSpaceKey || !currentSubsueloId) {
+    this.toastService.showWarning('No se pudo identificar el subsuelo actual del espacio.');
+    return;
+  }
+
+  const options = this.buildTransferSubsueloOptions(currentSubsueloId);
+  if (!options.length) {
+    this.toastService.showWarning('No hay otros subsuelos disponibles para transferir este espacio.');
+    return;
+  }
+
+  this.transferSubsueloOptions = options;
+  this.selectedTransferSubsueloId = '';
+  this.showTransferSpaceModal = true;
+}
+
+private buildTransferSubsueloOptions(currentSubsueloId: string): TransferSubsueloOption[] {
+  return (this.subsuelos || [])
+    .filter(sub => sub.id !== currentSubsueloId)
+    .map(sub => {
+      const spaces = Object.values(this.spaces).filter(space => space.subsueloId === sub.id);
+      const occupiedSpaces = spaces.filter(space => space.occupied).length;
+
+      return {
+        id: sub.id,
+        label: sub.label || sub.id,
+        totalSpaces: spaces.length,
+        occupiedSpaces,
+        freeSpaces: Math.max(spaces.length - occupiedSpaces, 0)
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+selectTransferSubsuelo(subsueloId: string): void {
+  this.selectedTransferSubsueloId = subsueloId;
+}
+
+closeTransferSpaceModal(): void {
+  if (this.isSubmittingTransferSpace) {
+    return;
+  }
+
+  this.showTransferSpaceModal = false;
+  this.selectedTransferSubsueloId = '';
+  this.transferSubsueloOptions = [];
+}
+
+confirmTransferSpaceSelection(): void {
+  if (!this.selectedTransferSubsueloId) {
+    this.toastService.showWarning('Selecciona un subsuelo destino para continuar.');
+    return;
+  }
+
+  const newSubsuelo = this.selectedTransferSubsueloId;
+  const targetOption = this.transferSubsueloOptions.find(option => option.id === newSubsuelo);
+
+  this.isSubmittingTransferSpace = true;
+
+  try {
+    // Transferir localmente (tu logica actual)
+    this.autolavadoService.transferSpace(this.selectedSpaceKey, newSubsuelo);
+
+    // Transferir en backend
+    this.autolavadoService.transferSpaceInBackend(this.selectedSpaceKey, newSubsuelo).subscribe({
+      next: () => {
+        console.log('Espacio transferido en backend');
+        this.filterSpaces();
+        this.cdr.detectChanges();
+        this.isSubmittingTransferSpace = false;
+        this.closeTransferSpaceModal();
+        this.toastService.showSuccess(`Espacio transferido correctamente a ${targetOption?.label || newSubsuelo}.`);
+      },
+      error: (err) => {
+        console.warn('Error transferiendo en backend (funciona offline)', err);
+        this.filterSpaces();
+        this.cdr.detectChanges();
+        this.isSubmittingTransferSpace = false;
+        this.closeTransferSpaceModal();
+        this.toastService.showWarning('Espacio transferido localmente. Se sincronizara cuando vuelva la conexion.');
       }
-    }
+    });
+  } catch (error: any) {
+    this.isSubmittingTransferSpace = false;
+    this.toastService.showError('Error al transferir espacio: ' + (error?.message || error));
   }
 }
 
@@ -4485,16 +4062,10 @@ closeWhatsAppModalOccupied(): void {
 copyMessageOccupied(): void {
   navigator.clipboard.writeText(this.whatsappMessageOccupied).then(() => {
     this.hasCopiedMessageOccupied = true;
-
-       const toastEl = document.getElementById('copyToast');
-    if (toastEl) {
-      const toast = new bootstrap.Toast(toastEl);
-      toast.show();
-    }
+    this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   }).catch(err => {
     console.error('Error copying message:', err);
-    // Fallback alert si clipboard falla
-    alert('Error al copiar mensaje');
+    this.toastService.showError('No se pudo copiar el mensaje.');
   });
 
 
@@ -4510,15 +4081,10 @@ copyMessageOccupied01(): void {
       this.saveSentWhatsappState(); // ← Persistir en localStorage
     }
 
-    // Toast de éxito (tu código actual)
-    const toastEl = document.getElementById('copyToast');
-    if (toastEl) {
-      const toast = new bootstrap.Toast(toastEl);
-      toast.show();
-    }
+    this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   }).catch(err => {
     console.error('Error copying message:', err);
-    alert('Error al copiar mensaje');
+    this.toastService.showError('No se pudo copiar el mensaje.');
   });
 }
 

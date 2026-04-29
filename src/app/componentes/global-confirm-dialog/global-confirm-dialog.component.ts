@@ -1,13 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener } from '@angular/core';
-import { ConfirmDialogState, ConfirmService } from '../../services/confirm.service';
+import { ConfirmDialogState, ConfirmService, ConfirmVariant } from '../../services/confirm.service';
 
 @Component({
   selector: 'app-global-confirm-dialog',
   standalone: true,
   imports: [CommonModule],
   templateUrl: './global-confirm-dialog.component.html',
-  styleUrl: './global-confirm-dialog.component.scss'
+  styleUrls: ['./global-confirm-dialog.component.scss']
 })
 export class GlobalConfirmDialogComponent {
   readonly dialog$ = this.confirmService.dialog$;
@@ -20,6 +20,30 @@ export class GlobalConfirmDialogComponent {
 
   accept(): void {
     this.confirmService.accept();
+  }
+
+  variantIcon(variant: ConfirmVariant): string {
+    switch (variant) {
+      case 'danger':
+        return 'fa-trash-can';
+      case 'warning':
+        return 'fa-triangle-exclamation';
+      case 'primary':
+      default:
+        return 'fa-circle-question';
+    }
+  }
+
+  variantBadge(variant: ConfirmVariant): string {
+    switch (variant) {
+      case 'danger':
+        return 'Accion sensible';
+      case 'warning':
+        return 'Confirmacion requerida';
+      case 'primary':
+      default:
+        return 'Decision pendiente';
+    }
   }
 
   trackDialog(state: ConfirmDialogState | null): ConfirmDialogState | null {
