@@ -4,9 +4,10 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 
 import { Subject, takeUntil, combineLatest, BehaviorSubject, forkJoin, debounceTime, distinctUntilChanged, map, switchMap, of, catchError, Observable } from 'rxjs';
 import { Client, Space, Subsuelo, VehicleType } from '../../models/autolavado.model';
-import { AutolavadoService } from '../../services/autolavado.service';
+import { AutolavadoService, PagedResponse } from '../../services/autolavado.service';
 import { QrService } from '../../services/qr.service';
 import { ToastService } from '../../services/toast.service';
+import { ConfirmService } from '../../services/confirm.service';
 
 import intlTelInput from 'intl-tel-input';
 import { FormatPhonePipe } from "../../services/format-phone.pipe";
@@ -71,6 +72,12 @@ private activeClientVehiclesKey: string | null = null;
 
   searchTermClients = '';
   filteredClientsAdmin: Client[] = [];
+  clientsAdminPage = 0;
+  clientsAdminPageSize = 20;
+  clientsAdminTotalPages = 0;
+  clientsAdminTotalElements = 0;
+  isLoadingClientsAdmin = false;
+  private clientsAdminSearchTimer: any = null;
   //editedSpace: any = {}; // Nueva propiedad para datos del espacio editado
   editedSpace: Space | null = null;
   currentPage: number = 1;
@@ -212,7 +219,8 @@ clientVehiclesModalError = '';
     private qrService: QrService,
     private fb: FormBuilder,
      private cdr: ChangeDetectorRef,
-     private toastService: ToastService
+     private toastService: ToastService,
+     private confirmService: ConfirmService
   ) {
     this.clientForm = this.fb.group({
       name: ['', Validators.required],
@@ -354,7 +362,9 @@ this.uiRefreshIntervalId = setInterval(() => {
   .pipe(takeUntil(this.destroy$))
   .subscribe((clientsMap) => {
     this.allClients = Object.values(clientsMap);
-    this.filterClientsAdmin();
+    if (!this.isClientsDbOpen) {
+      this.filteredClientsAdmin = this.allClients;
+    }
 
     console.log('[Spaces] clients$ actualizado', {
       totalMap: Object.keys(clientsMap || {}).length,
@@ -1313,20 +1323,30 @@ openAddVehicleModal(): void {
 
 // NUEVO MÉTODO: Cargar subsuelos y espacios desde backend como respaldo
 openClientsAdminModal(): void {
-  this.loadAllClientsFromBackend();
+  this.loadClientsAdminPageFromBackend();
   const modal = new bootstrap.Modal(document.getElementById('clientsAdminModal')!);
   modal.show();
 }
 
 openClientsDb(): void {
   this.isClientsDbOpen = true;
-  this.loadAllClientsFromBackend();
+  this.clientsAdminPage = 0;
+  this.searchTermClients = '';
+  this.loadClientsAdminPageFromBackend();
 }
 
 closeClientsDb(): void {
   this.isClientsDbOpen = false;
   this.searchTermClients = '';
   this.filteredClientsAdmin = [];
+  this.clientsAdminPage = 0;
+  this.clientsAdminTotalPages = 0;
+  this.clientsAdminTotalElements = 0;
+
+  if (this.clientsAdminSearchTimer) {
+    clearTimeout(this.clientsAdminSearchTimer);
+    this.clientsAdminSearchTimer = null;
+  }
 }
 
 
@@ -2307,25 +2327,23 @@ selectClientVehicleItem(item: ClientVehicleItem): void {
 
 
 filterClientsAdmin(): void {
-  if (!this.searchTermClients.trim()) {
-    this.filteredClientsAdmin = this.allClients;
-    return;
+  if (!this.isClientsDbOpen) return;
+
+  this.clientsAdminPage = 0;
+
+  if (this.clientsAdminSearchTimer) {
+    clearTimeout(this.clientsAdminSearchTimer);
   }
 
-  const term = this.searchTermClients.toLowerCase();
-  this.filteredClientsAdmin = this.allClients.filter(client =>
-    (client.name?.toLowerCase().includes(term)) ||
-    (client.dni?.includes(term)) ||
-    (client.phoneIntl?.includes(term)) ||
-    (client.vehicle?.toLowerCase().includes(term)) ||
-    (client.plate?.toLowerCase().includes(term)) ||
-    (client.code?.toLowerCase().includes(term))
-  );
+  this.clientsAdminSearchTimer = setTimeout(() => {
+    this.loadClientsAdminPageFromBackend();
+  }, 300);
 }
 
 clearSearchClients(): void {
   this.searchTermClients = '';
-  this.filteredClientsAdmin = this.allClients;
+  this.clientsAdminPage = 0;
+  this.loadClientsAdminPageFromBackend();
 }
 
 
@@ -2366,6 +2384,44 @@ exportClientsDbToExcel(): void {
 }
 
 
+
+exportAllUniqueClientsDbToExcel(): void {
+  const confirmed = confirm('Deseas exportar la base de datos de clientes a Excel?');
+  if (!confirmed) return;
+
+  this.autolavadoService.getUniqueClientsFromBackend().subscribe({
+    next: (rows) => {
+      const data = (rows || []).map(client => ({
+        ID: client.id,
+        Codigo: client.code,
+        Nombre: client.name,
+        DNI: client.dni,
+        Telefono: client.phoneIntl,
+        Vehiculo: client.vehicle,
+        Matricula: client.plate,
+        Categoria: client.category,
+        Precio: client.price,
+        MetodoPago: client.paymentMethod,
+        Espacio: client.spaceKey,
+        Ingreso: client.entryTimestamp ? new Date(client.entryTimestamp).toLocaleString() : '-',
+        Salida: client.exitTimestamp ? new Date(client.exitTimestamp).toLocaleString() : '-'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes');
+
+      const fileName = `base_datos_clientes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      this.toastService.showSuccess('Base de datos exportada correctamente');
+    },
+    error: (err) => {
+      console.error('Error exportando clientes', err);
+      alert('No se pudo exportar la base de datos de clientes');
+    }
+  });
+}
 
 loadAllClientsFromBackend0(): void {
   this.autolavadoService.getAllClientsFromBackend().subscribe({
@@ -2471,6 +2527,69 @@ loadAllClientsFromBackend(): void {
 }
 
 
+loadClientsAdminPageFromBackend(): void {
+  this.isLoadingClientsAdmin = true;
+
+  this.autolavadoService.getUniqueClientsPageFromBackend(
+    this.clientsAdminPage,
+    this.clientsAdminPageSize,
+    this.searchTermClients
+  ).subscribe({
+    next: (response: PagedResponse<Client>) => {
+      const clients = response?.content || [];
+
+      this.filteredClientsAdmin = clients;
+      this.clientsAdminPage = response?.page ?? 0;
+      this.clientsAdminPageSize = response?.size ?? this.clientsAdminPageSize;
+      this.clientsAdminTotalPages = response?.totalPages ?? 0;
+      this.clientsAdminTotalElements = response?.totalElements ?? 0;
+
+      this.ensureMonthlyServiceCountCacheForCurrentMonth();
+      this.monthlyServiceCountByDni.clear();
+      this.preloadMonthlyServiceCountsForClients(clients);
+
+      console.log('Clientes unicos paginados cargados desde backend:', {
+        page: this.clientsAdminPage,
+        size: this.clientsAdminPageSize,
+        totalPages: this.clientsAdminTotalPages,
+        totalElements: this.clientsAdminTotalElements,
+        content: clients.length
+      });
+    },
+    error: (err) => {
+      console.error('Error cargando clientes', err);
+      alert('No se pudieron cargar los clientes');
+    },
+    complete: () => {
+      this.isLoadingClientsAdmin = false;
+    }
+  });
+}
+
+get clientsAdminPageLabel(): number {
+  return this.clientsAdminPage + 1;
+}
+
+get canGoToPreviousClientsAdminPage(): boolean {
+  return this.clientsAdminPage > 0;
+}
+
+get canGoToNextClientsAdminPage(): boolean {
+  return this.clientsAdminPage + 1 < this.clientsAdminTotalPages;
+}
+
+goToPreviousClientsAdminPage(): void {
+  if (!this.canGoToPreviousClientsAdminPage) return;
+  this.clientsAdminPage -= 1;
+  this.loadClientsAdminPageFromBackend();
+}
+
+goToNextClientsAdminPage(): void {
+  if (!this.canGoToNextClientsAdminPage) return;
+  this.clientsAdminPage += 1;
+  this.loadClientsAdminPageFromBackend();
+}
+
 getSpaceByKey(spaceKey: string | null): Space | undefined {
   if (!spaceKey) return undefined;
   return this.autolavadoService.spacesSubject.value[spaceKey];
@@ -2551,28 +2670,84 @@ editClient(client: Client): void {
 deleteClient(clientId: any): void {
   if (confirm(`¿Eliminar cliente ID ${clientId}? Esto liberará el espacio que ocupa (si lo tiene).`)) {
     console.log('Iniciando eliminación del cliente ID:', clientId);
+    const shouldGoPreviousPage = this.filteredClientsAdmin.length === 1 && this.clientsAdminPage > 0;
 
     this.autolavadoService.deleteClientFromBackend(clientId).subscribe({
       next: () => {
         console.log(`Cliente ${clientId} eliminado correctamente`);
 
-        // La suscripción a clients$ ya actualiza allClients y filteredClientsAdmin automáticamente
-        // Solo actualizamos la vista de espacios
+        // El modal usa una vista paginada/deduplicada; hay que recargarla explícitamente.
+        if (shouldGoPreviousPage) {
+          this.clientsAdminPage -= 1;
+        }
+        this.loadClientsAdminPageFromBackend();
         this.filterSpaces();
         this.cdr.detectChanges();
 
-        alert('Cliente eliminado correctamente');
+        this.toastService.showSuccess('Cliente eliminado correctamente');
       },
       error: (err) => {
         console.error('Error eliminando cliente', err);
-        alert('Error al eliminar cliente');
+        if (err?.status === 404) {
+          if (shouldGoPreviousPage) {
+            this.clientsAdminPage -= 1;
+          }
+          this.loadClientsAdminPageFromBackend();
+          this.toastService.showError('El cliente ya no existía en el servidor. La lista fue recargada.');
+          return;
+        }
+
+        this.toastService.showError('Error al eliminar cliente');
       }
     });
   }
 }
 
 
+async deleteClientWithConfirm(clientId: any): Promise<void> {
+  const confirmed = await this.confirmService.confirm({
+    title: 'Eliminar cliente',
+    message: `¿Eliminar cliente ID ${clientId}?\nEsto liberará el espacio que ocupa si todavía lo tiene asociado.`,
+    confirmText: 'Eliminar',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
 
+  if (!confirmed) {
+    return;
+  }
+
+  console.log('Iniciando eliminación del cliente ID:', clientId);
+  const shouldGoPreviousPage = this.filteredClientsAdmin.length === 1 && this.clientsAdminPage > 0;
+
+  this.autolavadoService.deleteClientFromBackend(clientId).subscribe({
+    next: () => {
+      console.log(`Cliente ${clientId} eliminado correctamente`);
+
+      if (shouldGoPreviousPage) {
+        this.clientsAdminPage -= 1;
+      }
+      this.loadClientsAdminPageFromBackend();
+      this.filterSpaces();
+      this.cdr.detectChanges();
+
+      this.toastService.showSuccess('Cliente eliminado correctamente');
+    },
+    error: (err) => {
+      console.error('Error eliminando cliente', err);
+      if (err?.status === 404) {
+        if (shouldGoPreviousPage) {
+          this.clientsAdminPage -= 1;
+        }
+        this.loadClientsAdminPageFromBackend();
+        this.toastService.showError('El cliente ya no existía en el servidor. La lista fue recargada.');
+        return;
+      }
+
+      this.toastService.showError('Error al eliminar cliente');
+    }
+  });
+}
 
 
 
@@ -4398,6 +4573,8 @@ trackByClientVehicleModel(index: number, item: ClientVehicleItem): string | numb
 trackByVisitId(index: number, visit: Client): any {
   return visit?.id ?? `${visit?.dni || 'x'}-${visit?.vehicle || 'x'}-${index}`;
 }
+
+
 
 trackByPageNumber(index: number, page: number): number {
   return page;

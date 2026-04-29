@@ -19,6 +19,27 @@
     <div class="reports-modal__body">
       <div class="card reports-card">
         <div class="card-body">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+            <div class="input-group" style="max-width: 320px;">
+              <input
+                type="text"
+                class="form-control"
+                placeholder="Buscar por periodo o fecha..."
+                [(ngModel)]="searchTerm"
+                (input)="onSearchChange()"
+              >
+            </div>
+            <select class="form-select" style="max-width: 180px;" [(ngModel)]="periodTypeFilter" (change)="onPeriodTypeChange()">
+              <option value="">Todos</option>
+              <option value="DAILY">Diario</option>
+              <option value="MONTHLY">Mensual</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">Limpiar</button>
+            <div class="ms-auto text-muted small">
+              Página {{ currentPageLabel }} / {{ totalPages || 1 }} · {{ totalElements }} reportes
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="table table-dark table-striped align-middle">
               <thead>
@@ -71,9 +92,22 @@
             </table>
           </div>
 
+          <div *ngIf="isLoading" class="text-center text-muted py-3">
+            Cargando reportes...
+          </div>
+
           <div *ngIf="reportRows.length === 0" class="text-center text-muted py-4">
             No hay reportes disponibles.
             <button class="btn btn-sm btn-outline-primary ms-2" (click)="refreshReports()">Recargar</button>
+          </div>
+
+          <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
+            <button class="btn btn-outline-secondary btn-sm" (click)="goPrevPage()" [disabled]="!canGoPrevPage || isLoading">
+              Anterior
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" (click)="goNextPage()" [disabled]="!canGoNextPage || isLoading">
+              Siguiente
+            </button>
           </div>
         </div>
       </div>

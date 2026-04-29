@@ -1,0 +1,17 @@
+<div class="global-toast-stack" *ngIf="toasts$ | async as toasts">
+  <div
+    *ngFor="let toast of toasts; trackBy: trackByToastId"
+    class="global-toast"
+    [ngClass]="'global-toast--' + toast.variant"
+  >
+    <div class="global-toast__message">{{ toast.message }}</div>
+    <button
+      type="button"
+      class="global-toast__close"
+      aria-label="Cerrar notificación"
+      (click)="dismiss(toast)"
+    >
+      ×
+    </button>
+  </div>
+</div>

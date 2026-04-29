@@ -1,51 +1,54 @@
 import { Injectable } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
+
+export type ToastVariant = 'success' | 'error' | 'info' | 'warning';
+
+export interface ToastItem {
+  id: number;
+  message: string;
+  variant: ToastVariant;
+  duration: number;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ToastService {
+  private readonly toastsSubject = new BehaviorSubject<ToastItem[]>([]);
+  readonly toasts$ = this.toastsSubject.asObservable();
+  private nextId = 1;
 
-  constructor() { }
-
-
-showSuccess(message: string): void {
-    const toast = document.createElement('div');
-    toast.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 p-3';
-    toast.style.zIndex = '9999';
-    toast.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body text-white">
-          ✓ ${message}
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-      </div>
-    `;
-    document.body.appendChild(toast);
-
-    const bsToast = new (window as any).bootstrap.Toast(toast, { delay: 4000 });
-    bsToast.show();
-
-    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  showSuccess(message: string, duration: number = 4000): void {
+    this.show(message, 'success', duration);
   }
 
-  showError(message: string): void {
-    const toast = document.createElement('div');
-    toast.className = 'toast align-items-center text-bg-danger border-0 position-fixed bottom-0 end-0 p-3';
-    toast.style.zIndex = '9999';
-    toast.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body text-white">
-          ✗ ${message}
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-      </div>
-    `;
-    document.body.appendChild(toast);
-
-    const bsToast = new (window as any).bootstrap.Toast(toast, { delay: 5000 });
-    bsToast.show();
-
-    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  showError(message: string, duration: number = 5000): void {
+    this.show(message, 'error', duration);
   }
 
+  showInfo(message: string, duration: number = 4000): void {
+    this.show(message, 'info', duration);
+  }
+
+  showWarning(message: string, duration: number = 4500): void {
+    this.show(message, 'warning', duration);
+  }
+
+  dismiss(id: number): void {
+    this.toastsSubject.next(
+      this.toastsSubject.value.filter((toast) => toast.id !== id)
+    );
+  }
+
+  private show(message: string, variant: ToastVariant, duration: number): void {
+    const toast: ToastItem = {
+      id: this.nextId++,
+      message,
+      variant,
+      duration
+    };
+
+    this.toastsSubject.next([...this.toastsSubject.value, toast]);
+    window.setTimeout(() => this.dismiss(toast.id), duration);
+  }
 }

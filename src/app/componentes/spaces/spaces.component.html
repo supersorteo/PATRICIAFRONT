@@ -792,6 +792,9 @@
             </tr>
           </tbody>
         </table>
+        <div *ngIf="isLoadingClientsAdmin" class="text-center py-4 text-muted">
+          Cargando clientes...
+        </div>
       </div>
     </div>
   </div>
@@ -1147,7 +1150,7 @@
     <div class="clientes-db-modal__header d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
       <h2 class="clientes-db-modal__title mb-0">
         <i class="fas fa-users me-2"></i>
-        Base de datos de clientes ({{allClients.length}} registrados)
+        Base de datos de clientes ({{ clientsAdminTotalElements || allClients.length }} registrados)
       </h2>
       <!--button-- class="btn btn-outline-light btn-lg" type="button" (click)="closeClientsDb()">
         <i class="fas fa-times me-2"></i> Cerrar
@@ -1244,7 +1247,7 @@
                   <!--button-- class="btn btn-warning btn-sm" title="Editar" (click)="editClient(client)">
                     <i class="fas fa-edit"></i>
                   </!--button-->
-                  <button class="btn btn-danger btn-sm" title="Eliminar" (click)="deleteClient(client.id)">
+                  <button class="btn btn-danger btn-sm" title="Eliminar" (click)="deleteClientWithConfirm(client.id)">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -1259,7 +1262,7 @@
       </div>
     </div>
 
-    <div class="clientes-db-modal__footer px-4 py-3 border-top d-flex align-items-center gap-2">
+    <div class="clientes-db-modal__footer px-4 py-3 border-top d-flex align-items-center gap-2 flex-wrap">
       <div class="input-group w-50">
         <input
           type="text"
@@ -1271,10 +1274,21 @@
           Limpiar
         </button>
       </div>
-      <button class="btn btn-outline-success" type="button" (click)="exportClientsDbToExcel()">
+      <button class="btn btn-outline-success" type="button" (click)="exportAllUniqueClientsDbToExcel()">
         <i class="bi bi-file-earmark-excel me-2"></i>
         Exportar BD a Excel
       </button>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <span class="text-muted small">
+          Página {{ clientsAdminPageLabel }} / {{ clientsAdminTotalPages || 1 }} · {{ clientsAdminTotalElements }} clientes
+        </span>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPreviousClientsAdminPage()" [disabled]="!canGoToPreviousClientsAdminPage || isLoadingClientsAdmin">
+          Anterior
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToNextClientsAdminPage()" [disabled]="!canGoToNextClientsAdminPage || isLoadingClientsAdmin">
+          Siguiente
+        </button>
+      </div>
     </div>
   </div>
 </div>

@@ -1,22 +1,31 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { SpacesComponent } from "./componentes/spaces/spaces.component";
-import { ReportsComponent } from "./componentes/reports/reports.component";
-import { ArribaComponent } from "./componentes/arriba/arriba.component";
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { SpacesComponent } from './componentes/spaces/spaces.component';
+import { ReportsComponent } from './componentes/reports/reports.component';
+import { GlobalToastComponent } from './componentes/global-toast/global-toast.component';
+import { GlobalConfirmDialogComponent } from './componentes/global-confirm-dialog/global-confirm-dialog.component';
+import { ConfirmService } from './services/confirm.service';
+import { ToastService } from './services/toast.service';
 import { environment } from '../environments/environment';
-
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, SpacesComponent, ReportsComponent, FormsModule],
+  imports: [
+    CommonModule,
+    SpacesComponent,
+    ReportsComponent,
+    FormsModule,
+    GlobalToastComponent,
+    GlobalConfirmDialogComponent
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  title = 'Gestión de Autolavado-Parking — Bosquejo';
+  title = 'Gestión de Autolavado-Parking';
   isLoggedIn = false;
   username = '';
   password = '';
@@ -27,14 +36,15 @@ export class AppComponent {
   private apiUrl = environment.backendUrl;
   token = '';
 
-  constructor(private http: HttpClient) {
-      this.checkAuth();
-
+  constructor(
+    private http: HttpClient,
+    private confirmService: ConfirmService,
+    private toastService: ToastService
+  ) {
+    this.checkAuth();
   }
 
-
-
-  private checkAuth() {
+  private checkAuth(): void {
     const savedToken = localStorage.getItem('token');
     const savedUsername = localStorage.getItem('username');
 
@@ -42,16 +52,15 @@ export class AppComponent {
       this.token = savedToken;
       this.username = savedUsername;
       this.isLoggedIn = true;
-      this.verifyToken(); // Verifica si el token sigue válido
-    } else {
-      this.isLoggedIn = false;
-      this.isCheckingAuth = false; // Sin datos → mostrar login
+      this.verifyToken();
+      return;
     }
+
+    this.isLoggedIn = false;
+    this.isCheckingAuth = false;
   }
 
-
-
-login() {
+  login(): void {
     if (!this.username || !this.password) {
       this.errorMessage = 'Ingresá usuario y contraseña';
       return;
@@ -63,19 +72,17 @@ login() {
     this.http.post(`${this.apiUrl}/api/auth/login`, {
       username: this.username,
       password: this.password
-
     }).subscribe({
       next: (response: any) => {
         this.token = response.token;
-       // this.username = response.username;
         this.username = response.username || this.username;
         localStorage.setItem('token', this.token);
         localStorage.setItem('username', this.username);
         this.isLoggedIn = true;
         this.isCheckingAuth = false;
         this.isLoading = false;
-
         this.password = '';
+        this.toastService.showSuccess('Sesión iniciada correctamente.');
       },
       error: (err) => {
         this.errorMessage = err.error?.error || 'Credenciales inválidas';
@@ -84,39 +91,36 @@ login() {
     });
   }
 
-
-  private verifyToken0() {
+  private verifyToken0(): void {
     const headers = new HttpHeaders().set('Authorization', `Bearer ${this.token}`);
     this.http.get(`${this.apiUrl}/api/auth/users`, { headers }).subscribe({
       next: () => {
         this.isLoggedIn = true;
         this.isCheckingAuth = false;
-
       },
       error: () => {
-        this.logout();
+        this.logout0();
         this.isCheckingAuth = false;
       }
     });
   }
 
-  private verifyToken() {
+  private verifyToken(): void {
     const headers = new HttpHeaders().set('Authorization', `Bearer ${this.token}`);
     this.http.get(`${this.apiUrl}/api/auth/users`, { headers }).subscribe({
       next: () => {
-        // Token válido → mantener sesión
         this.isLoggedIn = true;
         this.isCheckingAuth = false;
       },
       error: (err) => {
         console.warn('Verificación de token falló:', err.status, err.message);
-        this.logout(); // Limpia todo si el token ya no es válido
+        this.logout0();
         this.isCheckingAuth = false;
       }
     });
   }
 
-  private tryLogin(username: string, password: string, silent: boolean = false) {
+  private tryLogin(username: string, password: string, silent: boolean = false): void {
     if (!silent) {
       this.isLoading = true;
       this.errorMessage = '';
@@ -132,11 +136,8 @@ login() {
         this.isCheckingAuth = false;
         this.username = username;
         localStorage.setItem('auth', JSON.stringify({ username, password }));
-       /* if (!silent) {
-          alert('¡Bienvenido de nuevo!');
-        }*/
       },
-      error: (err) => {
+      error: () => {
         this.isLoading = false;
         this.isCheckingAuth = false;
         this.errorMessage = 'Sesión expirada o credenciales inválidas. Iniciá sesión nuevamente.';
@@ -145,9 +146,7 @@ login() {
     });
   }
 
-
-
-logout0() {
+  logout0(): void {
     this.isLoggedIn = false;
     this.token = '';
     this.username = '';
@@ -156,25 +155,20 @@ logout0() {
     this.isCheckingAuth = false;
   }
 
-  logout() {
-  // Mensaje de confirmación nativo del navegador
-  const confirmed = confirm("¿Estás seguro de que quieres cerrar sesión?");
+  async logoutWithConfirm(): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Cerrar sesión',
+      message: '¿Estás seguro de que quieres cerrar sesión?',
+      confirmText: 'Cerrar sesión',
+      cancelText: 'Cancelar',
+      variant: 'warning'
+    });
 
-  if (confirmed) {
-    // Solo ejecuta el logout si el usuario confirma
-    this.isLoggedIn = false;
-    this.token = '';
-    this.username = '';
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    this.isCheckingAuth = false;
+    if (!confirmed) {
+      return;
+    }
 
-    // Opcional: pequeño mensaje de éxito (nativo también)
-    alert("Sesión cerrada correctamente.");
+    this.logout0();
+    this.toastService.showSuccess('Sesión cerrada correctamente.');
   }
-  // Si cancela, no pasa nada → se queda logueado
-}
-
-
-
 }

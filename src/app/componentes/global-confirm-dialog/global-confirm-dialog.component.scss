@@ -1,0 +1,54 @@
+.global-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  z-index: 3100;
+}
+
+.global-confirm-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 3101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.global-confirm-card {
+  width: min(32rem, 100%);
+  background: #fff;
+  color: #0f172a;
+  border-radius: 1rem;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+  overflow: hidden;
+}
+
+.global-confirm-card__header,
+.global-confirm-card__body,
+.global-confirm-card__actions {
+  padding: 1.25rem 1.5rem;
+}
+
+.global-confirm-card__header {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.global-confirm-card__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.global-confirm-card__message {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.global-confirm-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}

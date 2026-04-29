@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { Report } from '../../models/autolavado.model';
-import { AutolavadoService } from '../../services/autolavado.service';
+import { AutolavadoService, PagedResponse } from '../../services/autolavado.service';
+import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 
 interface ReportListRow {
@@ -24,7 +25,7 @@ interface ReportListRow {
 @Component({
   selector: 'app-reports-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './reports-list.component.html',
   styleUrl: './reports-list.component.scss'
 })
@@ -33,6 +34,14 @@ export class ReportsListComponent implements OnInit{
 
   reports: Report[] = [];
   reportRows: ReportListRow[] = [];
+  isLoading = false;
+  searchTerm = '';
+  periodTypeFilter = '';
+  page = 0;
+  pageSize = 20;
+  totalPages = 0;
+  totalElements = 0;
+  private searchTimer: any = null;
   private apiBase = environment.apiUrl;
 
    constructor(private http: HttpClient, private autolavadoService:AutolavadoService) {}
@@ -42,12 +51,34 @@ export class ReportsListComponent implements OnInit{
   }
 
   loadReports(): void {
-    this.http.get<Report[]>(`${this.apiBase}/reports`).subscribe({
-      next: (data) => {
+    this.isLoading = true;
+
+    let params = new HttpParams()
+      .set('page', this.page.toString())
+      .set('size', this.pageSize.toString());
+
+    const normalizedSearch = this.searchTerm.trim();
+    const normalizedPeriodType = this.periodTypeFilter.trim();
+
+    if (normalizedSearch) {
+      params = params.set('search', normalizedSearch);
+    }
+
+    if (normalizedPeriodType) {
+      params = params.set('periodType', normalizedPeriodType);
+    }
+
+    this.http.get<PagedResponse<Report>>(`${this.apiBase}/reports/page`, { params }).subscribe({
+      next: (response) => {
+        const data = response?.content || [];
         this.reports = [...data].sort((a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
         this.reportRows = this.reports.map((r) => this.toRow(r));
+        this.page = response?.page ?? 0;
+        this.pageSize = response?.size ?? this.pageSize;
+        this.totalPages = response?.totalPages ?? 0;
+        this.totalElements = response?.totalElements ?? 0;
         console.log('Reportes recibidos:', this.reportRows);
       },
       error: (error) => {
@@ -55,6 +86,9 @@ export class ReportsListComponent implements OnInit{
         alert('Error al cargar reportes: ' + error.message + '. Verifica backend.');
         this.reports = [];
         this.reportRows = [];
+      },
+      complete: () => {
+        this.isLoading = false;
       }
     });
   }
@@ -96,6 +130,51 @@ export class ReportsListComponent implements OnInit{
   }
 
   refreshReports(): void {
+    this.page = 0;
+    this.loadReports();
+  }
+
+  onSearchChange(): void {
+    this.page = 0;
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+    }
+    this.searchTimer = setTimeout(() => this.loadReports(), 300);
+  }
+
+  onPeriodTypeChange(): void {
+    this.page = 0;
+    this.loadReports();
+  }
+
+  clearFilters(): void {
+    this.searchTerm = '';
+    this.periodTypeFilter = '';
+    this.page = 0;
+    this.loadReports();
+  }
+
+  get currentPageLabel(): number {
+    return this.page + 1;
+  }
+
+  get canGoPrevPage(): boolean {
+    return this.page > 0;
+  }
+
+  get canGoNextPage(): boolean {
+    return this.page + 1 < this.totalPages;
+  }
+
+  goPrevPage(): void {
+    if (!this.canGoPrevPage) return;
+    this.page -= 1;
+    this.loadReports();
+  }
+
+  goNextPage(): void {
+    if (!this.canGoNextPage) return;
+    this.page += 1;
     this.loadReports();
   }
 

@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, combineLatest, forkJoin, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
@@ -57,6 +57,16 @@ export interface ClientData {
   vehicle?: string;
   plate?: string;
   notes?: string;
+}
+
+export interface PagedResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
 }
 
 
@@ -954,6 +964,19 @@ getAllClientsFromBackend(): Observable<Client[]> {
 
 getUniqueClientsFromBackend(): Observable<Client[]> {
   return this.http.get<Client[]>(`${this.API_BASE}/clients/unique`);
+}
+
+getUniqueClientsPageFromBackend(page: number = 0, size: number = 20, search: string = ''): Observable<PagedResponse<Client>> {
+  let params = new HttpParams()
+    .set('page', page.toString())
+    .set('size', size.toString());
+
+  const normalizedSearch = (search || '').trim();
+  if (normalizedSearch) {
+    params = params.set('search', normalizedSearch);
+  }
+
+  return this.http.get<PagedResponse<Client>>(`${this.API_BASE}/clients/unique/page`, { params });
 }
 
 
