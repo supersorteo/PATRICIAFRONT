@@ -902,43 +902,89 @@
 </div>
 
 <!-- Modal para agregar nuevo tipo de vehículo -->
-<div *ngIf="showAddVehicleModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.7); z-index: 2070;">
+<div id="addVehicleModal" class="modal fade" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content bg-dark text-white border-0 shadow-lg">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title">Nuevo Vehículo</h5>
-        <button type="button" class="btn-close btn-close-white" (click)="showAddVehicleModal = false"></button>
+    <div class="modal-content border-0 shadow-lg overflow-hidden" style="background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #0f3460 100%); color: #f1f5f9;">
+
+      <!-- Header -->
+      <div class="modal-header border-0 px-4 pt-4 pb-2">
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center justify-content-center rounded-3" style="width:44px;height:44px;background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+            <i class="bi bi-car-front-fill fs-5 text-white"></i>
+          </div>
+          <div>
+            <h5 class="modal-title mb-0 fw-bold text-white">Nuevo Tipo de Vehículo</h5>
+            <small style="color:#94a3b8;">Completá los datos para registrarlo</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-50" (click)="closeAddVehicleModal()"></button>
       </div>
 
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">Modelo *</label>
-          <input type="text" class="form-control bg-secondary text-white border-secondary" [(ngModel)]="newVehicleModel" autofocus>
+      <div class="modal-body px-4 pb-2 pt-3">
+
+        <!-- Modelo -->
+        <div class="mb-4">
+          <label class="form-label fw-semibold mb-2" style="color:#94a3b8;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;">
+            <i class="bi bi-tag-fill me-1" style="color:#818cf8;"></i>Modelo del vehículo
+          </label>
+          <input id="newVehicleModelInput" type="text"
+            class="form-control border-0 py-3 fw-medium"
+            style="background:rgba(255,255,255,0.07);color:#f1f5f9;border-radius:12px;font-size:1rem;outline:2px solid transparent;transition:outline-color .15s;"
+            onfocus="this.style.outlineColor='#818cf8'" onblur="this.style.outlineColor='transparent'"
+            placeholder="Ej: Toyota Corolla, Honda Civic..."
+            [(ngModel)]="newVehicleModel">
         </div>
 
-        <div class="mb-3">
-          <label class="form-label">Categoría *</label>
-          <select class="form-select bg-secondary text-white border-secondary" [(ngModel)]="newVehicleCategory" (change)="updatePriceFromCategory()">
-            <option value="SUV">SUV</option>
-            <option value="AUTO">AUTO</option>
-            <option value="PICKUP">PICKUP</option>
-            <option value="ALTO PORTE">ALTO PORTE</option>
-            <option value="MOTO">MOTO</option>
-          </select>
+        <!-- Categoría como botones -->
+        <div class="mb-4">
+          <label class="form-label fw-semibold mb-2" style="color:#94a3b8;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;">
+            <i class="bi bi-grid-fill me-1" style="color:#818cf8;"></i>Categoría
+          </label>
+          <div class="d-flex flex-wrap gap-2">
+            <button *ngFor="let cat of vehicleCategories" type="button"
+              class="btn btn-sm fw-semibold px-3 py-2 d-flex align-items-center gap-1"
+              [style.background]="newVehicleCategory === cat.value ? cat.activeColor : 'rgba(255,255,255,0.07)'"
+              [style.color]="newVehicleCategory === cat.value ? '#fff' : '#94a3b8'"
+              [style.border]="newVehicleCategory === cat.value ? 'none' : '1px solid rgba(255,255,255,0.1)'"
+              style="border-radius:10px;transition:all .2s;"
+              (click)="newVehicleCategory = cat.value; updatePriceFromCategory()">
+              <i class="bi" [ngClass]="cat.icon"></i>
+              {{ cat.value }}
+            </button>
+          </div>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label">Precio *</label>
-          <input type="number" class="form-control bg-secondary text-white border-secondary" [(ngModel)]="newVehiclePrice" min="1000">
+        <!-- Precio -->
+        <div class="mb-2">
+          <label class="form-label fw-semibold mb-2" style="color:#94a3b8;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;">
+            <i class="bi bi-cash-stack me-1" style="color:#818cf8;"></i>Precio base
+          </label>
+          <div class="input-group" style="border-radius:12px;overflow:hidden;">
+            <span class="input-group-text border-0 fw-bold px-3" style="background:rgba(99,102,241,0.25);color:#818cf8;font-size:1rem;">$</span>
+            <input type="number"
+              class="form-control border-0 py-3 fw-bold"
+              style="background:rgba(255,255,255,0.07);color:#22c55e;font-size:1.2rem;"
+              [(ngModel)]="newVehiclePrice" min="1000">
+          </div>
+          <small style="color:#64748b;">Precio sugerido según categoría — podés editarlo</small>
         </div>
+
       </div>
 
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-outline-secondary" (click)="showAddVehicleModal = false">Cancelar</button>
-        <button type="button" class="btn btn-primary" (click)="saveNewVehicle()" [disabled]="!newVehicleModel.trim()">
-          Guardar
+      <!-- Footer -->
+      <div class="modal-footer border-0 px-4 pb-4 pt-2 gap-2">
+        <button type="button" class="btn px-4 py-2 fw-semibold"
+          style="background:rgba(255,255,255,0.07);color:#94a3b8;border-radius:10px;border:1px solid rgba(255,255,255,0.1);"
+          (click)="closeAddVehicleModal()">
+          <i class="bi bi-x-lg me-1"></i> Cancelar
+        </button>
+        <button type="button" class="btn px-4 py-2 fw-bold flex-grow-1"
+          style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:10px;border:none;"
+          (click)="saveNewVehicle()" [disabled]="!newVehicleModel.trim()">
+          <i class="bi bi-plus-circle-fill me-2"></i> Guardar Vehículo
         </button>
       </div>
+
     </div>
   </div>
 </div>

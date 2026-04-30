@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil, combineLatest, catchError, of, map, switchMap, forkJoin } from 'rxjs';
@@ -124,7 +124,8 @@ private statsRefreshIntervalId: any = null;
     private cdr: ChangeDetectorRef,
     private http: HttpClient,
     private toastService: ToastService,
-    private confirmService: ConfirmService
+    private confirmService: ConfirmService,
+    private ngZone: NgZone
   ) {}
 
 
@@ -158,10 +159,12 @@ private statsRefreshIntervalId: any = null;
       this.cdr.detectChanges();
     });
 
-    this.statsRefreshIntervalId = setInterval(() => {
-    this.calculateStats();
-    this.cdr.detectChanges();
-  }, 60000);
+    this.ngZone.runOutsideAngular(() => {
+      this.statsRefreshIntervalId = setInterval(() => {
+        this.calculateStats();
+        this.ngZone.run(() => this.cdr.detectChanges());
+      }, 60000);
+    });
 
    /* setInterval(() => {
       this.calculateStats();

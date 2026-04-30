@@ -141,14 +141,22 @@ selectedVehicleModel = '';
 
 
 showNewVehicleModal = false;
-newVehicleModel = ''; // Se prellenará con lo que escribió el usuario
-newVehicleCategory = 'AUTO'; // Valor por defecto
-newVehiclePrice = 35000; // Valor por defecto
+newVehicleModel = '';
+newVehicleCategory = 'AUTO';
+newVehiclePrice = 35000;
+private vehicleModalFocusGuard: ((e: FocusEvent) => void) | null = null;
 
-showVehicleAside = false;          // Abre/cierra el aside lateral
-vehicleFilter = '';                // Para filtrar la tabla en el aside
-selectedVehicleCategory = '';      // Filtro por tipo en el aside
-showAddVehicleModal = false;
+showVehicleAside = false;
+vehicleFilter = '';
+selectedVehicleCategory = '';
+
+readonly vehicleCategories = [
+  { value: 'AUTO',       icon: 'bi-car-front-fill',    activeColor: 'linear-gradient(135deg,#6366f1,#818cf8)' },
+  { value: 'SUV',        icon: 'bi-truck',              activeColor: 'linear-gradient(135deg,#0ea5e9,#38bdf8)' },
+  { value: 'PICKUP',     icon: 'bi-truck-flatbed',      activeColor: 'linear-gradient(135deg,#f59e0b,#fbbf24)' },
+  { value: 'ALTO PORTE', icon: 'bi-bus-front-fill',     activeColor: 'linear-gradient(135deg,#ef4444,#f87171)' },
+  { value: 'MOTO',       icon: 'bi-bicycle',            activeColor: 'linear-gradient(135deg,#22c55e,#4ade80)' },
+];
 
 currentVehiclePage = 1;
 vehiclePageSize = 20;
@@ -340,8 +348,17 @@ this.uiRefreshIntervalId = setInterval(() => {
       }
     },
     error: (err) => {
-      console.error('Error al cargar vehículos', err);
-      this.toastService.showError('No se pudieron cargar los tipos de vehiculos.');
+      const cached = this.autolavadoService.vehicleTypesSubject.value;
+      if (cached.length > 0) {
+        this.vehicles = cached;
+        const currentVehicle = this.clientForm.get('vehicle')?.value;
+        if (!currentVehicle) {
+          this.clientForm.patchValue({ vehicle: cached[0].model, price: cached[0].price });
+        }
+      } else {
+        console.error('Error al cargar vehículos', err);
+        this.toastService.showError('Sin conexion: no hay tipos de vehiculos disponibles.');
+      }
     }
   });
 
@@ -1181,7 +1198,7 @@ async onVehicleInput(event: Event): Promise<void> {
 
     if (confirmed) {
       this.newVehicleModel = typed;
-      this.showAddVehicleModal = true;
+      this.openAddVehicleModal();
     } else {
       input.value = '';
     }
@@ -1209,12 +1226,33 @@ setVehicleCategoryFilter(category: string): void {
   this.currentVehiclePage = 1;
 }
 
-// Abre modal para agregar nuevo desde el aside
 openAddVehicleModal(): void {
   this.newVehicleModel = '';
   this.newVehicleCategory = 'AUTO';
   this.newVehiclePrice = 35000;
-  this.showAddVehicleModal = true;
+  const el = document.getElementById('addVehicleModal') as HTMLElement;
+
+  // Corta la burbuja de focusin antes de que el FocusTrap del modal padre la intercepte
+  this.vehicleModalFocusGuard = (e: FocusEvent) => e.stopPropagation();
+  el.addEventListener('focusin', this.vehicleModalFocusGuard);
+
+  const modal = new bootstrap.Modal(el, { focus: false });
+  modal.show();
+  setTimeout(() => {
+    el.style.zIndex = '1070';
+    const backdrop = document.querySelector('.modal-backdrop:last-of-type') as HTMLElement;
+    if (backdrop) backdrop.style.zIndex = '1065';
+    document.getElementById('newVehicleModelInput')?.focus();
+  }, 50);
+}
+
+closeAddVehicleModal(): void {
+  const el = document.getElementById('addVehicleModal');
+  if (el && this.vehicleModalFocusGuard) {
+    el.removeEventListener('focusin', this.vehicleModalFocusGuard);
+    this.vehicleModalFocusGuard = null;
+  }
+  bootstrap.Modal.getInstance(el)?.hide();
 }
 
 // NUEVO MÉTODO: Cargar subsuelos y espacios desde backend como respaldo
@@ -2859,9 +2897,32 @@ private executeReservationFlow(ctx: {
       this.finalizeReservationSuccess(localClient, serverClient);
     },
     error: (err) => {
+      if (Number(err?.status || 0) === 0) {
+        this.finalizeReservationOffline(localClient, payload);
+        return;
+      }
+
       this.handleReservationError(err, spacesBefore, clientsBefore, 'No se pudo guardar en backend. Se revirtió la reserva local.');
     }
   });
+}
+
+
+private finalizeReservationOffline(localClient: Client, payload: any): void {
+  this.autolavadoService.queueReservationSync({
+    spaceKey: this.selectedSpaceKey,
+    payload,
+    existingClientId: this.existingClientId || undefined
+  });
+
+  this.spaces = { ...this.autolavadoService.spacesSubject.value };
+  this.clients = { ...this.autolavadoService.clientsSubject.value };
+
+  this.filterSpaces();
+  this.cdr.detectChanges();
+
+  this.toastService.showWarning('Sin conexion con el servidor. La reserva quedo guardada localmente y se sincronizara automaticamente.');
+  this.openWhatsApp();
 }
 
 
@@ -3312,14 +3373,14 @@ saveNewVehicle(): void {
       console.log('Nuevo tipo creado:', newType);
       this.vehicles.push(newType);
       this.vehicles.sort((a, b) => a.model.localeCompare(b.model));
-      this.showAddVehicleModal = false;
+      this.closeAddVehicleModal();
 
       this.clientForm.patchValue({
         vehicle: newType.model,
         price: newType.price
       });
 
-      this.toastService.showSuccess(`Vehículo "${newType.model}" agregado`);
+      this.toastService.showSuccess(`Vehículo "${newType.model}" (${newType.category}) creado — $${newType.price.toLocaleString('es-AR')}`);
     },
     error: (err) => {
       console.error('Error creando vehículo:', err);

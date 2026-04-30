@@ -1,9 +1,14 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, combineLatest, forkJoin, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
 import { ClientVehicle, Report, VehicleType } from '../models/autolavado.model';
 import { environment } from '../../environments/environment';
+import { ClientsApiService } from './api/clients-api.service';
+import { OfflineSyncService } from './offline-sync.service';
+import { ReportsApiService } from './api/reports-api.service';
+import { SpacesApiService } from './api/spaces-api.service';
+import { StorageSyncService } from './storage-sync.service';
 
 // Interfaces
 export interface Subsuelo {
@@ -80,7 +85,9 @@ export class AutolavadoService {
   private readonly LS_KEYS = {
     subs: 'alw_subsuelos',
     spaces: 'alw_spaces',
-    clients: 'alw_clients'
+    clients: 'alw_clients',
+    currentSub: 'alw_current_sub',
+    vehicleTypes: 'alw_vehicle_types'
   };
 
   // Subjects para estado reactivo
@@ -88,6 +95,7 @@ export class AutolavadoService {
   public spacesSubject = new BehaviorSubject<{ [key: string]: Space }>({});
   public clientsSubject = new BehaviorSubject<{ [key: string]: Client }>({});
   public currentSubIdSubject = new BehaviorSubject<string | null>(null);
+  public vehicleTypesSubject = new BehaviorSubject<VehicleType[]>([]);
   private searchTermSubject = new BehaviorSubject<string>('');
 
   private API_BASE = environment.apiUrl;
@@ -212,28 +220,27 @@ private isInitializingFromBackend = false;
 private hasCompletedInitialBackendSync = false;
 
 
-  constructor(private http: HttpClient) {
-   this.loadAll();  // Carga desde localStorage
-
-  // Si localStorage falló o está vacío → cargar desde backend como respaldo
- /* if (
-    this.subsuelosSubject.value.length === 0 ||
-    Object.keys(this.spacesSubject.value).length === 0 ||
-    Object.keys(this.clientsSubject.value).length === 0
+  constructor(
+    private http: HttpClient,
+    private clientsApi: ClientsApiService,
+    private offlineSync: OfflineSyncService,
+    private reportsApi: ReportsApiService,
+    private spacesApi: SpacesApiService,
+    private storageSync: StorageSyncService
   ) {
-    console.log('LocalStorage vacío o corrupto → cargando datos desde backend como respaldo');
-    this.loadAllFromBackend();
-  }*/
-
-    this.ensureAtLeastOneSubsuelo();
+   this.loadAll();  // Carga desde localStorage
+   this.ensureAtLeastOneSubsuelo();
+   this.offlineSync.syncCompleted$.subscribe(() => {
+    this.initializeDataPreferBackend(true);
+   });
   }
 
 
 loadAllFromBackend(): void {
   forkJoin({
-    subsuelos: this.http.get<Subsuelo[]>(`${this.API_BASE}/subsuelos`),
-    spaces: this.http.get<Space[]>(`${this.API_BASE}/spaces`),
-    clients: this.http.get<Client[]>(`${this.API_BASE}/clients`)
+    subsuelos: this.spacesApi.getSubsuelos(),
+    spaces: this.spacesApi.getSpaces(),
+    clients: this.clientsApi.getAllClients()
   }).subscribe({
     next: ({ subsuelos, spaces, clients }) => {
       console.log('Datos cargados exitosamente desde backend', { subsuelos, spaces, clients });
@@ -281,30 +288,33 @@ loadAllFromBackend(): void {
 }
 
   loadSubsuelosFromBackend(): Observable<Subsuelo[]> {
-  return this.http.get<Subsuelo[]>(`${this.API_BASE}/subsuelos`);
+  return this.spacesApi.getSubsuelos();
 }
 
 loadSpacesFromBackend(): Observable<Space[]> {
-  return this.http.get<Space[]>(`${this.API_BASE}/spaces`);
+  return this.spacesApi.getSpaces();
 }
 
 // GUARDAR SUBSUELO EN BACKEND
 saveSubsueloToBackend(subsuelo: Subsuelo): Observable<Subsuelo> {
-  return this.http.post<Subsuelo>(`${this.API_BASE}/subsuelos`, subsuelo);
+  return this.spacesApi.createSubsuelo(subsuelo);
 }
 
 // GUARDAR ESPACIO EN BACKEND
 saveSpaceToBackend(space: Space): Observable<Space> {
-  return this.http.post<Space>(`${this.API_BASE}/spaces`, space);
+  return this.spacesApi.createSpace(space);
 }
 
 
 
 
 saveClientToBackend(data: { spaceKey: string; payload: any }): Observable<Client> {
-  const { spaceKey, payload } = data;
-  console.log('Enviando reserva al backend:', { spaceKey, payload });
-  return this.http.post<Client>(`${this.API_BASE}/clients/spaces/${spaceKey}/reserve`, payload);
+  console.log('Enviando reserva al backend:', data);
+  return this.clientsApi.reserveOrUpdateClient({ ...data });
+}
+
+queueReservationSync(data: { spaceKey: string; payload: any; existingClientId?: number }): void {
+  this.offlineSync.enqueue('reserveClient', data);
 }
 
 initializeDataFromBackend(): void {
@@ -337,11 +347,6 @@ initializeDataFromBackend(): void {
     error: (err) => console.warn('Error cargando espacios desde backend', err)
   });
 }
-
-
-
-
-
 
 
 initializeDataPreferBackend(force: boolean = false): void {
@@ -463,7 +468,7 @@ upsertDailyReportSnapshotBeforeClose$(): Observable<Report | null> {
     currentClients: currentClients.length
   });
 
-  return this.http.get<Report[]>(`${this.API_BASE}/reports`).pipe(
+  return this.reportsApi.getReports().pipe(
     map((reports) => (reports || []).filter(r => this.isSameDailyReport(r, periodKey))),
     switchMap((existingDailyReports) => {
       console.log('[CloseDay] Reportes diarios existentes del día', {
@@ -506,7 +511,7 @@ upsertDailyReportSnapshotBeforeClose$(): Observable<Report | null> {
       (finalPayload as any).dailyFinal = true;
       // Borrar reportes diarios existentes del día (si hay) y recrear consolidado
       const deleteCalls = existingDailyReports.map(r =>
-        this.http.delete<void>(`${this.API_BASE}/reports/${r.id}`).pipe(
+        this.reportsApi.deleteReport(r.id).pipe(
           catchError((err) => {
             console.warn('[CloseDay] Error borrando reporte diario previo', { reportId: r.id, err });
             // no aborta; seguimos intentando consolidar
@@ -516,7 +521,7 @@ upsertDailyReportSnapshotBeforeClose$(): Observable<Report | null> {
       );
 
       return (deleteCalls.length ? forkJoin(deleteCalls) : of([])).pipe(
-        switchMap(() => this.http.post<Report>(`${this.API_BASE}/reports`, finalPayload)),
+        switchMap(() => this.reportsApi.createReport(finalPayload)),
         tap((saved) => {
           console.log('[CloseDay] Reporte diario consolidado guardado', {
             reportId: saved?.id,
@@ -537,7 +542,7 @@ upsertDailyReportSnapshotBeforeClose$(): Observable<Report | null> {
 finalizeDailyReportAndCloseDayInBackend$(): Observable<void> {
   console.log('[CloseDay] Ejecutando cierre del día en backend (finalizar reporte + reset)...');
 
-  return this.http.post<void>(`${this.API_BASE}/reports/daily/finalize-and-close`, {}).pipe(
+  return this.reportsApi.finalizeAndCloseDay().pipe(
     switchMap(() => {
       console.log('[CloseDay] Backend cerró el día. Recargando estado (subsuelos/spaces/clients)...');
 
@@ -875,6 +880,7 @@ reserveOrUpdateClient(data: {
   payload: any;
   existingClientId?: number
 }): Observable<Client> {
+  return this.clientsApi.reserveOrUpdateClient(data);
   const { spaceKey, payload, existingClientId } = data;
 
   if (existingClientId) {
@@ -892,7 +898,12 @@ getVehicleTypeById(id: number): Observable<VehicleType> {
 
 // Opcional: Crear nuevo tipo de vehículo (para admin futuro)
   loadVehicleTypes(): Observable<VehicleType[]> {
-  return this.http.get<VehicleType[]>(`${this.API_BASE}/vehicle-types`);
+  return this.http.get<VehicleType[]>(`${this.API_BASE}/vehicle-types`).pipe(
+    tap(types => {
+      this.vehicleTypesSubject.next(types);
+      this.saveAll();
+    })
+  );
 }
 
 createVehicleType(vehicle: { model: string; category: string; price: number }): Observable<VehicleType> {
@@ -915,21 +926,21 @@ deleteVehicleType(id: number): Observable<void> {
 
 // ELIMINAR SUBSUELO EN BACKEND
 deleteSubsueloFromBackend(subsueloId: string): Observable<void> {
-  return this.http.delete<void>(`${this.API_BASE}/subsuelos/${subsueloId}`);
+  return this.spacesApi.deleteSubsuelo(subsueloId);
 }
 
 // ELIMINAR ESPACIO EN BACKEND
 deleteSpaceFromBackend(spaceKey: string): Observable<void> {
-  return this.http.delete<void>(`${this.API_BASE}/spaces/${spaceKey}`);
+  return this.spacesApi.deleteSpace(spaceKey);
 }
 
 // ACTUALIZAR ESPACIO EN BACKEND
 updateSpaceInBackend(space: Space): Observable<Space> {
-  return this.http.put<Space>(`${this.API_BASE}/spaces/${space.key}`, space);
+  return this.spacesApi.updateSpace(space);
 }
 
 releaseSpaceInBackend(spaceKey: string): Observable<void> {
-  return this.http.put<void>(`${this.API_BASE}/clients/spaces/${spaceKey}/release`, {});
+  return this.clientsApi.releaseSpace(spaceKey);
 }
 
 
@@ -937,46 +948,36 @@ releaseSpaceInBackend(spaceKey: string): Observable<void> {
 
 // ACTUALIZAR SUBSUELO EN BACKEND
 updateSubsueloInBackend(subsuelo: Subsuelo): Observable<Subsuelo> {
-  return this.http.put<Subsuelo>(`${this.API_BASE}/subsuelos/${subsuelo.id}`, subsuelo);
+  return this.spacesApi.updateSubsuelo(subsuelo);
 }
 
 getClientFromBackend(clientId: number | string): Observable<Client> {
-  return this.http.get<Client>(`${this.API_BASE}/clients/${clientId}`);
+  return this.clientsApi.getClient(clientId);
 }
 
 loadClientsFromBackend(): Observable<Client[]> {
-  return this.http.get<Client[]>(`${this.API_BASE}/clients`);
+  return this.clientsApi.getAllClients();
 }
 
 transferSpaceInBackend(spaceKey: string, newSubsueloId: string): Observable<Space> {
-  const payload = { newSubsueloId };
-  return this.http.put<Space>(`${this.API_BASE}/spaces/${spaceKey}/transfer`, payload);
+  return this.spacesApi.transferSpace(spaceKey, newSubsueloId);
 }
 
 resetDataInBackend(): Observable<void> {
-  return this.http.delete<void>(`${this.API_BASE}/clients/reset`);
+  return this.clientsApi.resetClients();
 }
 
 getAllClientsFromBackend(): Observable<Client[]> {
-  return this.http.get<Client[]>(`${this.API_BASE}/clients`);
+  return this.clientsApi.getAllClients();
 }
 
 
 getUniqueClientsFromBackend(): Observable<Client[]> {
-  return this.http.get<Client[]>(`${this.API_BASE}/clients/unique`);
+  return this.clientsApi.getUniqueClients();
 }
 
 getUniqueClientsPageFromBackend(page: number = 0, size: number = 20, search: string = ''): Observable<PagedResponse<Client>> {
-  let params = new HttpParams()
-    .set('page', page.toString())
-    .set('size', size.toString());
-
-  const normalizedSearch = (search || '').trim();
-  if (normalizedSearch) {
-    params = params.set('search', normalizedSearch);
-  }
-
-  return this.http.get<PagedResponse<Client>>(`${this.API_BASE}/clients/unique/page`, { params });
+  return this.clientsApi.getUniqueClientsPage(page, size, search);
 }
 
 
@@ -984,13 +985,7 @@ getMonthlyServiceCountByDni(dni: string, monthKey?: string): Observable<number> 
   const safeDni = (dni || '').trim();
   if (!safeDni) return of(0);
 
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const month = monthKey || defaultMonth;
-
-  return this.http.get<number>(
-    `${this.API_BASE}/clients/dni/${encodeURIComponent(safeDni)}/monthly-count?month=${month}`
-  );
+  return this.clientsApi.getMonthlyServiceCountByDni(safeDni, monthKey);
 }
 
 
@@ -1001,14 +996,7 @@ getMonthlyServiceCountsByDnis(dnis: string[], monthKey?: string): Observable<Rec
 
   if (!cleanDnis.length) return of({});
 
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const month = monthKey || defaultMonth;
-
-  return this.http.post<Record<string, number>>(
-    `${this.API_BASE}/clients/monthly-counts?month=${month}`,
-    cleanDnis
-  );
+  return this.clientsApi.getMonthlyServiceCountsByDnis(cleanDnis, monthKey);
 }
 
 
@@ -1017,7 +1005,7 @@ getMonthlyServiceCountsByDnis(dnis: string[], monthKey?: string): Observable<Rec
 deleteClientFromBackend(clientId: number): Observable<any> {
   console.log('Eliminando cliente ID:', clientId, 'del backend');
 
-  return this.http.delete<void>(`${this.API_BASE}/clients/${clientId}`).pipe(
+  return this.clientsApi.deleteClient(clientId).pipe(
     switchMap(() => {
       console.log('Cliente eliminado en backend. Recargando datos frescos...');
 
@@ -1048,12 +1036,12 @@ deleteClientFromBackend(clientId: number): Observable<any> {
 
 
 updateClientInBackend(clientId: any, updatedData: any): Observable<Client> {
-  return this.http.put<Client>(`${this.API_BASE}/clients/${clientId}`, updatedData);
+  return this.clientsApi.updateClient(clientId, updatedData);
 }
 
 getClientReservationsByDni(dni: string): Observable<Client[]> {
   if (!dni?.trim()) return of([]);
-  return this.http.get<Client[]>(`${this.API_BASE}/clients/dni/${dni}/reservas`).pipe(
+  return this.clientsApi.getClientReservationsByDni(dni).pipe(
     catchError(err => {
       console.error('Error obteniendo reservas por DNI', err);
       return of([]);
@@ -1064,28 +1052,23 @@ getClientReservationsByDni(dni: string): Observable<Client[]> {
 
 
 loadAll(): void {
-  try {
-    const subsuelos = JSON.parse(localStorage.getItem(this.LS_KEYS.subs) || '[]') as Subsuelo[];
-    const spaces = JSON.parse(localStorage.getItem(this.LS_KEYS.spaces) || '{}') as { [key: string]: Space };
-    const clients = JSON.parse(localStorage.getItem(this.LS_KEYS.clients) || '{}') as { [key: string]: Client };
+  const { subsuelos, spaces, clients, currentSubId, vehicleTypes } = this.storageSync.loadState(this.LS_KEYS);
 
-    // Poblar space.client para espacios ocupados
-    Object.values(spaces).forEach(space => {
-      if (space.occupied && space.clientId && clients[space.clientId]) {
-        space.client = clients[space.clientId];
-      } else {
-        space.client = null;
-      }
-    });
+  // Poblar space.client para espacios ocupados
+  Object.values(spaces).forEach(space => {
+    if (space.occupied && space.clientId && clients[space.clientId]) {
+      space.client = clients[space.clientId];
+    } else {
+      space.client = null;
+    }
+  });
 
-    this.subsuelosSubject.next(subsuelos);
-    this.spacesSubject.next(spaces);
-    this.clientsSubject.next(clients);
-  } catch (error) {
-    console.error('Error al cargar datos de localStorage:', error);
-    this.subsuelosSubject.next([]);
-    this.spacesSubject.next({});
-    this.clientsSubject.next({});
+  this.subsuelosSubject.next(subsuelos);
+  this.spacesSubject.next(spaces);
+  this.clientsSubject.next(clients);
+  this.currentSubIdSubject.next(currentSubId);
+  if (vehicleTypes.length > 0) {
+    this.vehicleTypesSubject.next(vehicleTypes);
   }
 }
 
@@ -1093,13 +1076,13 @@ loadAll(): void {
 
 
    saveAll(): void {
-    try {
-      localStorage.setItem(this.LS_KEYS.subs, JSON.stringify(this.subsuelosSubject.value));
-      localStorage.setItem(this.LS_KEYS.spaces, JSON.stringify(this.spacesSubject.value));
-      localStorage.setItem(this.LS_KEYS.clients, JSON.stringify(this.clientsSubject.value));
-    } catch (error) {
-      console.error('Error al guardar datos en localStorage:', error);
-    }
+    this.storageSync.saveState(this.LS_KEYS, {
+      subsuelos: this.subsuelosSubject.value,
+      spaces: this.spacesSubject.value,
+      clients: this.clientsSubject.value,
+      currentSubId: this.currentSubIdSubject.value,
+      vehicleTypes: this.vehicleTypesSubject.value
+    });
   }
 
   // Gestión de subsuelos
@@ -1116,7 +1099,9 @@ loadAll(): void {
       this.currentSubIdSubject.next(id);
       this.saveAll();
     } else {
-      this.currentSubIdSubject.next(subsuelos[0].id);
+      const currentSubId = this.currentSubIdSubject.value;
+      const hasCurrent = !!currentSubId && subsuelos.some(sub => sub.id === currentSubId);
+      this.currentSubIdSubject.next(hasCurrent ? currentSubId : subsuelos[0].id);
     }
   }
 
@@ -1147,6 +1132,7 @@ addSubsuelo(): void {
   this.spacesSubject.next({ ...spaces });
   this.currentSubIdSubject.next(id);
   this.saveAll();
+  const newSpaces = Object.values(spaces).filter(s => s.subsueloId === id);
 
   // GUARDAR EN BACKEND (respaldo)
   /*this.saveSubsueloToBackend(newSub).subscribe({
@@ -1168,16 +1154,24 @@ addSubsuelo(): void {
   this.saveSubsueloToBackend(newSub).subscribe({
     next: (serverSub) => {
       console.log('Subsuelo respaldado en servidor:', serverSub);
-      const newSpaces = Object.values(spaces).filter(s => s.subsueloId === id);
       console.log(`Respaldo backend: creando ${newSpaces.length} espacios para ${id}`);
       newSpaces.forEach(space => {
         this.saveSpaceToBackend(space).subscribe({
           next: (serverSpace) => console.log('Espacio respaldado en servidor:', serverSpace.key),
-          error: (err) => console.warn('Error respaldando espacio', err)
+          error: (err) => {
+            if (!this.offlineSync.isOfflineError(err)) return;
+            console.warn('Error respaldando espacio', err);
+            this.offlineSync.enqueue('createSpace', { space });
+          }
         });
       });
     },
-    error: (err) => console.warn('No se pudo respaldar subsuelo (funciona offline)', err)
+    error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) return;
+      console.warn('No se pudo respaldar subsuelo (funciona offline)', err);
+      this.offlineSync.enqueue('createSubsuelo', { subsuelo: newSub });
+      newSpaces.forEach(space => this.offlineSync.enqueue('createSpace', { space }));
+    }
   });
 
   console.log('Nuevo subsuelo creado:', newSub);
@@ -1232,8 +1226,9 @@ updateSubsuelo(id: string, newLabel: string): void {
       console.log('Subsuelo actualizado en backend:', serverSubsuelo.id);
     },
     error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) return;
       console.warn('Error actualizando subsuelo en backend (ya actualizado localmente)', id, err);
-      // No lanzamos error → la app ya funciona con localStorage
+      this.offlineSync.enqueue('updateSubsuelo', { subsuelo: updatedSubsuelo });
     }
   });
 }
@@ -1283,7 +1278,9 @@ addSpacesToCurrent(count: number): void {
         console.log('Espacio respaldado en servidor:', serverSpace.key);
       },
       error: (err) => {
+        if (!this.offlineSync.isOfflineError(err)) return;
         console.warn('No se pudo respaldar espacio en backend (funciona offline)', space.key, err);
+        this.offlineSync.enqueue('createSpace', { space });
       }
     });
   });
@@ -1295,6 +1292,7 @@ addSpacesToCurrent(count: number): void {
   setCurrentSubsuelo(id: string): void {
     if (this.subsuelosSubject.value.some(sub => sub.id === id)) {
       this.currentSubIdSubject.next(id);
+      this.saveAll();
     }
   }
 
@@ -1394,8 +1392,6 @@ saveClient(clientData: any, spaceKey: string): Client {
 
 
 addManualClient(clientData: any): Observable<Client> {
-  const url = `${this.API_BASE}/clients`;
-
   const cleanData = {
     name: clientData.name,
     dni: clientData.dni || null,
@@ -1411,7 +1407,7 @@ addManualClient(clientData: any): Observable<Client> {
     code: null
   };
 
-  return this.http.post<Client>(url, cleanData);
+  return this.clientsApi.addManualClient(cleanData);
 }
 
 
@@ -1517,7 +1513,7 @@ searchClientByDni(dni: string): Observable<Client | null> {
   if (!dni || dni.trim() === '') {
     return of(null);
   }
-  return this.http.get<Client>(`${this.API_BASE}/clients/dni/${dni}`).pipe(
+  return this.clientsApi.searchClientByDni(dni).pipe(
     catchError(err => {
       if (err.status === 404) {
         return of(null);
@@ -1760,9 +1756,7 @@ Muchas gracias por confiar en Exellssior. 🚗✨`;
 
 
   clearAllData(): void {
-    localStorage.removeItem(this.LS_KEYS.subs);
-    localStorage.removeItem(this.LS_KEYS.spaces);
-    localStorage.removeItem(this.LS_KEYS.clients);
+    this.storageSync.clearState(this.LS_KEYS);
 
     this.subsuelosSubject.next([]);
     this.spacesSubject.next({});
@@ -1802,8 +1796,9 @@ Muchas gracias por confiar en Exellssior. 🚗✨`;
       console.log('Espacio eliminado en backend:', spaceKey);
     },
     error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) return;
       console.warn('Error eliminando espacio en backend (ya eliminado localmente)', spaceKey, err);
-      // No lanzamos error → la app ya funciona con localStorage
+      this.offlineSync.enqueue('deleteSpace', { spaceKey });
     }
   });
 }
@@ -1853,7 +1848,10 @@ deleteSubsuelo(subsueloId: string): void {
   // Luego eliminar el subsuelo
   this.deleteSubsueloFromBackend(subsueloId).subscribe({
     next: () => console.log('Subsuelo eliminado en backend:', subsueloId),
-    error: (err) => console.warn('Error eliminando subsuelo en backend:', err)
+    error: (err) => {
+      console.warn('Error eliminando subsuelo en backend:', err);
+      this.offlineSync.enqueue('deleteSubsuelo', { subsueloId });
+    }
   });
   */
  console.log('Eliminando subsuelo en backend (incluye espacios):', subsueloId);
@@ -1901,7 +1899,9 @@ deleteSpacesFromCurrent(count: number): void {
         console.log('Espacio eliminado en backend:', key);
       },
       error: (err) => {
+        if (!this.offlineSync.isOfflineError(err)) return;
         console.warn('Error eliminando espacio en backend (ya eliminado localmente)', key, err);
+        this.offlineSync.enqueue('deleteSpace', { spaceKey: key });
       }
     });
   });
@@ -1963,8 +1963,9 @@ editSpace(oldKey: string, newKey: string, editedSpace: Space | null): void {
       console.log('Espacio actualizado en backend:', updatedSpace.key);
     },
     error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) return;
       console.warn('Error actualizando espacio en backend (ya editado localmente)', space.key, err);
-      // No lanzamos error → la app ya funciona con localStorage
+      this.offlineSync.enqueue('updateSpace', { space: { ...space } });
     }
   });
 }
@@ -2002,6 +2003,17 @@ transferSpace(spaceKey: string, newSubsueloId: string): void {
   this.spacesSubject.next({ ...spaces });
   this.clientsSubject.next({ ...clients });
   this.saveAll();
+
+  this.transferSpaceInBackend(spaceKey, newSubsueloId).subscribe({
+    next: () => {
+      console.log('Espacio transferido en backend:', spaceKey, newSubsueloId);
+    },
+    error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) return;
+      console.warn('Error transfiriendo espacio en backend (ya transferido localmente)', spaceKey, err);
+      this.offlineSync.enqueue('transferSpace', { spaceKey, newSubsueloId });
+    }
+  });
 }
 
 

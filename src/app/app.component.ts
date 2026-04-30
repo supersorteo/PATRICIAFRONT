@@ -7,8 +7,10 @@ import { ReportsComponent } from './componentes/reports/reports.component';
 import { GlobalToastComponent } from './componentes/global-toast/global-toast.component';
 import { GlobalConfirmDialogComponent } from './componentes/global-confirm-dialog/global-confirm-dialog.component';
 import { ConfirmService } from './services/confirm.service';
+import { OfflineSyncService } from './services/offline-sync.service';
 import { ToastService } from './services/toast.service';
 import { environment } from '../environments/environment';
+import { combineLatest, distinctUntilChanged, filter, skip } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -33,15 +35,34 @@ export class AppComponent {
   isLoading = false;
   showPassword = false;
   isCheckingAuth = true;
+  isOffline = false;
+  pendingSyncCount = 0;
+  isSyncingOfflineQueue = false;
   private apiUrl = environment.backendUrl;
   token = '';
 
   constructor(
     private http: HttpClient,
     private confirmService: ConfirmService,
-    private toastService: ToastService
+    private toastService: ToastService,
+    private offlineSync: OfflineSyncService
   ) {
     this.checkAuth();
+    combineLatest([
+      this.offlineSync.isOnline$,
+      this.offlineSync.pendingCount$,
+      this.offlineSync.isSyncing$
+    ]).subscribe(([isOnline, pendingCount, isSyncing]) => {
+      this.isOffline = !isOnline;
+      this.pendingSyncCount = pendingCount;
+      this.isSyncingOfflineQueue = isSyncing;
+    });
+
+    this.offlineSync.isOnline$.pipe(
+      skip(1),
+      distinctUntilChanged(),
+      filter(online => online && this.isLoggedIn)
+    ).subscribe(() => this.verifyToken());
   }
 
   private checkAuth(): void {
@@ -101,6 +122,13 @@ export class AppComponent {
         this.isCheckingAuth = false;
       },
       error: (err) => {
+        if (err.status === 0) {
+          // Sin conectividad — mantener sesión activa con datos locales
+          this.isLoggedIn = true;
+          this.isCheckingAuth = false;
+          return;
+        }
+        // Token inválido o expirado (401, 403, etc.) — cerrar sesión
         console.warn('Verificación de token falló:', err.status, err.message);
         this.logout();
         this.isCheckingAuth = false;
