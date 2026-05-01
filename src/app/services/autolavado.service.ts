@@ -74,6 +74,15 @@ export interface PagedResponse<T> {
   last: boolean;
 }
 
+export interface ResetDataResult {
+  offlineQueued?: boolean;
+}
+
+export interface ClientReservationsLookupResult {
+  reservations: Client[];
+  source: 'server' | 'local';
+}
+
 
 
 
@@ -232,6 +241,9 @@ private hasCompletedInitialBackendSync = false;
    this.ensureAtLeastOneSubsuelo();
    this.offlineSync.syncCompleted$.subscribe(() => {
     this.initializeDataPreferBackend(true);
+    this.loadVehicleTypes().pipe(
+      catchError(() => of([]))
+    ).subscribe();
    });
   }
 
@@ -315,6 +327,33 @@ saveClientToBackend(data: { spaceKey: string; payload: any }): Observable<Client
 
 queueReservationSync(data: { spaceKey: string; payload: any; existingClientId?: number }): void {
   this.offlineSync.enqueue('reserveClient', data);
+}
+
+queueReleaseSpaceSync(spaceKey: string): void {
+  this.offlineSync.enqueue('releaseSpace', { spaceKey });
+}
+
+queueResetDataSync(): void {
+  this.offlineSync.enqueue('resetClients', {});
+}
+
+queueAddManualClientSync(clientData: any, tempClientId?: string): void {
+  this.offlineSync.enqueue('addManualClient', {
+    clientData: this.buildManualClientPayload(clientData),
+    tempClientId
+  });
+}
+
+queueUpdateClientSync(clientId: number | string, updatedData: any): void {
+  this.offlineSync.enqueue('updateClient', { clientId, updatedData: this.buildClientUpdatePayload(updatedData) });
+}
+
+updatePendingManualClientSync(tempClientId: string, updatedData: any): boolean {
+  return this.offlineSync.updatePendingManualClient(tempClientId, this.buildManualClientPayload(updatedData));
+}
+
+queueCreateVehicleTypeSync(vehicle: { model: string; category: string; price: number }): void {
+  this.offlineSync.enqueue('createVehicleType', { vehicleType: vehicle });
 }
 
 initializeDataFromBackend(): void {
@@ -911,6 +950,24 @@ createVehicleType(vehicle: { model: string; category: string; price: number }): 
   return this.http.post<VehicleType>(`${this.API_BASE}/vehicle-types`, vehicle);
 }
 
+createVehicleTypeOffline(vehicle: { model: string; category: string; price: number }): VehicleType {
+  const tempVehicle: VehicleType = {
+    id: -Date.now(),
+    model: vehicle.model,
+    category: vehicle.category,
+    price: vehicle.price
+  };
+
+  const nextVehicleTypes = [...this.vehicleTypesSubject.value, tempVehicle].sort((a, b) =>
+    a.model.localeCompare(b.model)
+  );
+
+  this.vehicleTypesSubject.next(nextVehicleTypes);
+  this.saveAll();
+
+  return tempVehicle;
+}
+
 
 
 
@@ -976,6 +1033,10 @@ getUniqueClientsFromBackend(): Observable<Client[]> {
   return this.clientsApi.getUniqueClients();
 }
 
+getClientsByDateRange(from: string, to: string): Observable<Client[]> {
+  return this.clientsApi.getByDateRange(from, to);
+}
+
 getUniqueClientsPageFromBackend(page: number = 0, size: number = 20, search: string = ''): Observable<PagedResponse<Client>> {
   return this.clientsApi.getUniqueClientsPage(page, size, search);
 }
@@ -1004,32 +1065,41 @@ getMonthlyServiceCountsByDnis(dnis: string[], monthKey?: string): Observable<Rec
 
 deleteClientFromBackend(clientId: number): Observable<any> {
   console.log('Eliminando cliente ID:', clientId, 'del backend');
+  const targetClient = this.clientsSubject.value[clientId.toString()];
 
   return this.clientsApi.deleteClient(clientId).pipe(
-    switchMap(() => {
-      console.log('Cliente eliminado en backend. Recargando datos frescos...');
+    tap(() => {
+      if (!targetClient) {
+        return;
+      }
 
-      // Recargar espacios desde backend (para que el espacio liberado aparezca libre)
-      return this.loadSpacesFromBackend().pipe(
-        switchMap((spacesFromBackend: Space[]) => {
-          const spacesMap: { [key: string]: Space } = {};
-          spacesFromBackend.forEach(s => spacesMap[s.key] = s);
-          this.spacesSubject.next(spacesMap);
+      const nextClients = { ...this.clientsSubject.value };
+      const removedClientIds = new Set<string>();
 
-          // Recargar clientes desde backend (para eliminar el cliente borrado)
-          return this.loadClientsFromBackend();
-        }),
-        tap((clientsFromBackend: Client[]) => {
-          const clientsMap: { [key: string]: Client } = {};
-          clientsFromBackend.forEach(c => clientsMap[c.id.toString()] = c);
-          this.clientsSubject.next(clientsMap);
+      Object.entries(nextClients).forEach(([key, client]) => {
+        if (this.sameClientIdentity(client, targetClient)) {
+          removedClientIds.add(key);
+          delete nextClients[key];
+        }
+      });
 
-          // Guardar en localStorage los datos REALES del backend
-          this.saveAll();
+      const nextSpaces = { ...this.spacesSubject.value };
+      Object.values(nextSpaces).forEach(space => {
+        const currentClientId = space.clientId?.toString?.() ?? '';
+        if (removedClientIds.has(currentClientId)) {
+          space.occupied = false;
+          space.hold = false;
+          space.clientId = null;
+          space.startTime = null;
+          space.client = null;
+        }
+      });
 
-          console.log('localStorage actualizado: cliente eliminado y espacio liberado');
-        })
-      );
+      this.clientsSubject.next(nextClients);
+      this.spacesSubject.next(nextSpaces);
+      this.saveAll();
+
+      console.log('Estado local actualizado: cliente eliminado y espacios liberados sin recarga completa');
     })
   );
 }
@@ -1040,13 +1110,60 @@ updateClientInBackend(clientId: any, updatedData: any): Observable<Client> {
 }
 
 getClientReservationsByDni(dni: string): Observable<Client[]> {
-  if (!dni?.trim()) return of([]);
+  return this.getClientReservationsByDniWithSource(dni).pipe(
+    map(result => result.reservations)
+  );
+}
+
+getClientReservationsByDniWithSource(dni: string): Observable<ClientReservationsLookupResult> {
+  if (!dni?.trim()) {
+    return of({
+      reservations: [],
+      source: 'server'
+    });
+  }
   return this.clientsApi.getClientReservationsByDni(dni).pipe(
+    map(reservations => ({
+      reservations: reservations || [],
+      source: 'server' as const
+    })),
     catchError(err => {
+      if (this.offlineSync.isOfflineError(err)) {
+        console.warn('Backend no disponible para reservas por DNI. Usando cache local.', { dni });
+        return of({
+          reservations: this.getClientReservationsByDniFromLocal(dni),
+          source: 'local' as const
+        });
+      }
+
       console.error('Error obteniendo reservas por DNI', err);
-      return of([]);
+      return of({
+        reservations: [],
+        source: 'server' as const
+      });
     })
   );
+}
+
+private getClientReservationsByDniFromLocal(dni: string): Client[] {
+  const safeDni = (dni || '').toString().trim();
+  if (!safeDni) return [];
+
+  return Object.values(this.clientsSubject.value || {})
+    .filter(client => (client?.dni || '').toString().trim() === safeDni)
+    .sort((a, b) => {
+      const aTs = this.toLocalTimestamp(a.entryTimestamp) ?? this.toLocalTimestamp(a.exitTimestamp) ?? 0;
+      const bTs = this.toLocalTimestamp(b.entryTimestamp) ?? this.toLocalTimestamp(b.exitTimestamp) ?? 0;
+      return bTs - aTs;
+    });
+}
+
+private toLocalTimestamp(value: any): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 
@@ -1391,8 +1508,8 @@ saveClient(clientData: any, spaceKey: string): Client {
 
 
 
-addManualClient(clientData: any): Observable<Client> {
-  const cleanData = {
+private buildManualClientPayload(clientData: any): any {
+  return {
     name: clientData.name,
     dni: clientData.dni || null,
     phoneIntl: clientData.phoneIntl || null,
@@ -1400,14 +1517,103 @@ addManualClient(clientData: any): Observable<Client> {
     plate: clientData.plate || null,
     category: clientData.category || null,
     price: clientData.price || null,
-    clientVehicles: clientData.clientVehicles || [],  // <-- cambio real
+    notes: clientData.notes || null,
+    paymentMethod: clientData.paymentMethod || null,
+    clover: clientData.clover ?? null,
+    clientVehicles: clientData.clientVehicles || [],
     spaceKey: null,
     entryTimestamp: null,
     exitTimestamp: null,
     code: null
   };
+}
 
-  return this.clientsApi.addManualClient(cleanData);
+private buildClientUpdatePayload(updatedData: any): any {
+  return {
+    name: updatedData.name,
+    dni: updatedData.dni || null,
+    phoneIntl: updatedData.phoneIntl || null,
+    vehicle: updatedData.vehicle || null,
+    plate: updatedData.plate || null,
+    notes: updatedData.notes || null,
+    category: updatedData.category || null,
+    price: updatedData.price ?? null,
+    paymentMethod: updatedData.paymentMethod || null,
+    clover: updatedData.clover ?? null
+  };
+}
+
+updateClientOffline(clientId: number | string, updatedData: any): Client | null {
+  const currentClients = this.clientsSubject.value;
+  const clientKey = String(clientId);
+  const existingClient = currentClients[clientKey];
+
+  if (!existingClient) {
+    return null;
+  }
+
+  const payload = this.buildClientUpdatePayload(updatedData);
+  const nextClient: Client = {
+    ...existingClient,
+    ...payload,
+    phoneRaw: (payload.phoneIntl || existingClient.phoneRaw || '').toString().replace(/\D/g, ''),
+    clientVehicles: existingClient.clientVehicles || []
+  };
+
+  const nextClients = {
+    ...currentClients,
+    [clientKey]: nextClient
+  };
+
+  const nextSpaces = { ...this.spacesSubject.value };
+  Object.values(nextSpaces).forEach(space => {
+    if (space.clientId && String(space.clientId) === clientKey) {
+      space.client = nextClient;
+    }
+  });
+
+  this.clientsSubject.next(nextClients);
+  this.spacesSubject.next(nextSpaces);
+  this.saveAll();
+
+  return nextClient;
+}
+
+addManualClientOffline(clientData: any): Client {
+  const cleanData = this.buildManualClientPayload(clientData);
+  const tempId = 'temp-manual-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+  const nextClient: Client = {
+    id: tempId,
+    code: '',
+    name: cleanData.name,
+    dni: cleanData.dni || undefined,
+    phoneIntl: cleanData.phoneIntl || '',
+    phoneRaw: (cleanData.phoneIntl || '').toString().replace(/\D/g, ''),
+    vehicle: cleanData.vehicle || undefined,
+    plate: cleanData.plate || undefined,
+    notes: cleanData.notes || undefined,
+    spaceKey: null,
+    qrText: '',
+    category: cleanData.category || undefined,
+    price: cleanData.price ?? null,
+    clientVehicles: cleanData.clientVehicles || [],
+    paymentMethod: cleanData.paymentMethod || undefined,
+    clover: cleanData.clover ?? null,
+    entryTimestamp: null,
+    exitTimestamp: null
+  };
+
+  this.clientsSubject.next({
+    ...this.clientsSubject.value,
+    [tempId]: nextClient
+  });
+  this.saveAll();
+
+  return nextClient;
+}
+
+addManualClient(clientData: any): Observable<Client> {
+  return this.clientsApi.addManualClient(this.buildManualClientPayload(clientData));
 }
 
 
@@ -1451,49 +1657,19 @@ releaseSpace(spaceKey: string): Observable<any> {
 
   console.log('Espacio liberado localmente:', spaceKey);
 
-  // 2) Confirmar en backend y recargar estado real
+  // 2) Confirmar en backend conservando el estado local ya aplicado
   return this.releaseSpaceInBackend(spaceKey).pipe(
-    switchMap(() => {
-      console.log('Espacio liberado en backend. Recargando estado real...');
-
-      const spaces$ = this.loadSpacesFromBackend();
-      const client$ = clientId ? this.getClientFromBackend(clientId) : of(null);
-
-      return forkJoin({
-        spacesFromBackend: spaces$,
-        updatedClient: client$
-      });
-    }),
-    tap(({ spacesFromBackend, updatedClient }) => {
-      // Rehidratar spaces desde backend
-      const spacesMap: { [key: string]: Space } = {};
-      spacesFromBackend.forEach(s => {
-        spacesMap[s.key] = s;
-      });
-      this.spacesSubject.next(spacesMap);
-
-      // Actualizar cliente liberado con versión real backend
-      if (updatedClient) {
-        const currentClients = { ...this.clientsSubject.value };
-        currentClients[updatedClient.id.toString()] = updatedClient;
-        this.clientsSubject.next(currentClients);
-      }
-
-      // Mantener referencias space.client si las usas en UI
-      const currentClients = this.clientsSubject.value;
-      Object.values(spacesMap).forEach(sp => {
-        if (sp.occupied && sp.clientId && currentClients[sp.clientId]) {
-          sp.client = currentClients[sp.clientId];
-        } else {
-          sp.client = null;
-        }
-      });
-      this.spacesSubject.next({ ...spacesMap });
-
+    tap(() => {
       this.saveAll();
-      console.log('localStorage actualizado con datos reales del backend después de liberar espacio');
+      console.log('Espacio liberado en backend sin recarga completa de espacios/clientes');
     }),
     catchError((err) => {
+      if (this.offlineSync.isOfflineError(err)) {
+        console.warn('Sin conexion al liberar espacio. Se conserva el cambio local y se encola sincronizacion.', err);
+        this.queueReleaseSpaceSync(spaceKey);
+        throw err;
+      }
+
       console.error('Error liberando espacio en backend. Rollback local aplicado.', err);
 
       // Rollback del estado local
@@ -1504,6 +1680,24 @@ releaseSpace(spaceKey: string): Observable<any> {
       throw err;
     })
   );
+}
+
+private sameClientIdentity(a: Client, b: Client): boolean {
+  const aDni = (a?.dni || '').toString().trim();
+  const bDni = (b?.dni || '').toString().trim();
+  if (aDni && bDni) {
+    return aDni === bDni;
+  }
+
+  const aPhone = (a?.phoneIntl || a?.phoneRaw || '').toString().replace(/\D/g, '');
+  const bPhone = (b?.phoneIntl || b?.phoneRaw || '').toString().replace(/\D/g, '');
+  if (aPhone && bPhone) {
+    return aPhone === bPhone;
+  }
+
+  const aName = (a?.name || '').toString().trim().toLowerCase();
+  const bName = (b?.name || '').toString().trim().toLowerCase();
+  return !!aName && aName === bName;
 }
 
 
@@ -1527,7 +1721,7 @@ searchClientByDni(dni: string): Observable<Client | null> {
 
 
 
-resetData(): Observable<any> {
+resetData(): Observable<ResetDataResult> {
   const spaces = this.spacesSubject.value;
   const clients = this.clientsSubject.value;
 
@@ -1597,7 +1791,14 @@ resetData(): Observable<any> {
         clients: Object.keys(clientsMap).length
       });
     }),
+    map(() => ({ offlineQueued: false })),
     catchError((err) => {
+      if (this.offlineSync.isOfflineError(err)) {
+        console.warn('[RESET] Sin conexion con backend. Se conserva el cierre local y se encola sincronizacion.', err);
+        this.queueResetDataSync();
+        return of({ offlineQueued: true });
+      }
+
       console.error('[RESET] Error en backend. Aplicando rollback local...', err);
 
       // Rollback del estado local
@@ -1606,7 +1807,7 @@ resetData(): Observable<any> {
       this.saveAll();
 
       throw err;
-    })
+    }),
   );
 }
 

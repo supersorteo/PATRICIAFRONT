@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ToastItem, ToastService, ToastVariant } from '../../services/toast.service';
 
@@ -8,7 +8,8 @@ import { ToastItem, ToastService, ToastVariant } from '../../services/toast.serv
   standalone: true,
   imports: [CommonModule],
   templateUrl: './global-toast.component.html',
-  styleUrls: ['./global-toast.component.scss']
+  styleUrls: ['./global-toast.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GlobalToastComponent {
   readonly toasts$: Observable<ToastItem[]> = this.toastService.toasts$;

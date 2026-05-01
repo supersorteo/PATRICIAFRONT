@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener } from '@angular/core';
 import { ConfirmDialogState, ConfirmService, ConfirmVariant } from '../../services/confirm.service';
 
 @Component({
@@ -7,7 +7,8 @@ import { ConfirmDialogState, ConfirmService, ConfirmVariant } from '../../servic
   standalone: true,
   imports: [CommonModule],
   templateUrl: './global-confirm-dialog.component.html',
-  styleUrls: ['./global-confirm-dialog.component.scss']
+  styleUrls: ['./global-confirm-dialog.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GlobalConfirmDialogComponent {
   readonly dialog$ = this.confirmService.dialog$;

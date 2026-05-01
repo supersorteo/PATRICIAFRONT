@@ -95,6 +95,12 @@ export class ClientsApiService {
     );
   }
 
+  getByDateRange(from: string, to: string): Observable<Client[]> {
+    return this.http.get<Client[]>(`${this.apiBase}/clients/by-date-range`, {
+      params: { from, to }
+    });
+  }
+
   deleteClient(clientId: number): Observable<void> {
     return this.http.delete<void>(`${this.apiBase}/clients/${clientId}`);
   }

@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, firstValueFrom, Observable, Subject } from 'rxjs';
 import { Space, Subsuelo } from '../models/autolavado.model';
@@ -10,21 +11,31 @@ type OfflineSyncOperationType =
   | 'createSubsuelo'
   | 'createSpace'
   | 'updateSubsuelo'
+  | 'releaseSpace'
+  | 'resetClients'
   | 'deleteSpace'
   | 'deleteSubsuelo'
   | 'updateSpace'
   | 'transferSpace'
-  | 'reserveClient';
+  | 'reserveClient'
+  | 'addManualClient'
+  | 'updateClient'
+  | 'createVehicleType';
 
 interface OfflineSyncOperationMap {
   createSubsuelo: { subsuelo: Subsuelo };
   createSpace: { space: Space };
   updateSubsuelo: { subsuelo: Subsuelo };
+  releaseSpace: { spaceKey: string };
+  resetClients: Record<string, never>;
   deleteSpace: { spaceKey: string };
   deleteSubsuelo: { subsueloId: string };
   updateSpace: { space: Space };
   transferSpace: { spaceKey: string; newSubsueloId: string };
   reserveClient: { spaceKey: string; payload: any; existingClientId?: number };
+  addManualClient: { clientData: any; tempClientId?: string };
+  updateClient: { clientId: number | string; updatedData: any };
+  createVehicleType: { vehicleType: { model: string; category: string; price: number } };
 }
 
 export interface OfflineSyncOperation<T extends OfflineSyncOperationType = OfflineSyncOperationType> {
@@ -60,6 +71,7 @@ export class OfflineSyncService {
   readonly deadLetterCount$ = new BehaviorSubject<number>(0);
 
   constructor(
+    private http: HttpClient,
     private clientsApi: ClientsApiService,
     private spacesApi: SpacesApiService,
     private toastService: ToastService
@@ -95,6 +107,36 @@ export class OfflineSyncService {
     }
 
     void this.flushQueue();
+  }
+
+  updatePendingManualClient(tempClientId: string, clientData: any): boolean {
+    let wasUpdated = false;
+
+    this.queue = this.queue.map(operation => {
+      if (operation.type !== 'addManualClient') {
+        return operation;
+      }
+
+      const payload = operation.payload as OfflineSyncOperationMap['addManualClient'];
+      if (payload.tempClientId !== tempClientId) {
+        return operation;
+      }
+
+      wasUpdated = true;
+      return {
+        ...operation,
+        payload: {
+          ...payload,
+          clientData
+        }
+      };
+    });
+
+    if (wasUpdated) {
+      this.persistQueue();
+    }
+
+    return wasUpdated;
   }
 
   hasPendingOperations(): boolean {
@@ -183,6 +225,10 @@ export class OfflineSyncService {
         return this.spacesApi.createSpace((operation.payload as OfflineSyncOperationMap['createSpace']).space);
       case 'updateSubsuelo':
         return this.spacesApi.updateSubsuelo((operation.payload as OfflineSyncOperationMap['updateSubsuelo']).subsuelo);
+      case 'releaseSpace':
+        return this.clientsApi.releaseSpace((operation.payload as OfflineSyncOperationMap['releaseSpace']).spaceKey);
+      case 'resetClients':
+        return this.clientsApi.resetClients();
       case 'deleteSpace':
         return this.spacesApi.deleteSpace((operation.payload as OfflineSyncOperationMap['deleteSpace']).spaceKey);
       case 'deleteSubsuelo':
@@ -196,6 +242,20 @@ export class OfflineSyncService {
         );
       case 'reserveClient':
         return this.clientsApi.reserveOrUpdateClient(operation.payload as OfflineSyncOperationMap['reserveClient']);
+      case 'addManualClient':
+        return this.clientsApi.addManualClient(
+          (operation.payload as OfflineSyncOperationMap['addManualClient']).clientData
+        );
+      case 'updateClient':
+        return this.clientsApi.updateClient(
+          (operation.payload as OfflineSyncOperationMap['updateClient']).clientId,
+          (operation.payload as OfflineSyncOperationMap['updateClient']).updatedData
+        );
+      case 'createVehicleType':
+        return this.http.post(
+          `${environment.apiUrl}/vehicle-types`,
+          (operation.payload as OfflineSyncOperationMap['createVehicleType']).vehicleType
+        );
       default:
         throw new Error(`Operacion offline no soportada: ${(operation as OfflineSyncOperation).type}`);
     }

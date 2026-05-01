@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
+import { HttpParams } from '@angular/common/http';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { Report } from '../../models/autolavado.model';
-import { AutolavadoService, PagedResponse } from '../../services/autolavado.service';
+import { AutolavadoService } from '../../services/autolavado.service';
 import { FormsModule } from '@angular/forms';
-import { environment } from '../../../environments/environment';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
+import { ReportsApiService } from '../../services/reports-api.service';
 
 interface ReportListRow {
   raw: Report;
@@ -29,7 +29,8 @@ interface ReportListRow {
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './reports-list.component.html',
-  styleUrls: ['./reports-list.component.scss']
+  styleUrls: ['./reports-list.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ReportsListComponent implements OnInit{
   @Output() closed = new EventEmitter<void>();
@@ -44,13 +45,13 @@ export class ReportsListComponent implements OnInit{
   totalPages = 0;
   totalElements = 0;
   private searchTimer: any = null;
-  private apiBase = environment.apiUrl;
 
-   constructor(
-    private http: HttpClient,
+  constructor(
+    private reportsApi: ReportsApiService,
     private autolavadoService: AutolavadoService,
     private toastService: ToastService,
-    private confirmService: ConfirmService
+    private confirmService: ConfirmService,
+    private cdr: ChangeDetectorRef
   ) {}
 
    ngOnInit(): void {
@@ -75,7 +76,7 @@ export class ReportsListComponent implements OnInit{
       params = params.set('periodType', normalizedPeriodType);
     }
 
-    this.http.get<PagedResponse<Report>>(`${this.apiBase}/reports/page`, { params }).subscribe({
+    this.reportsApi.getPage(params).subscribe({
       next: (response) => {
         const data = response?.content || [];
         this.reports = [...data].sort((a, b) =>
@@ -87,21 +88,24 @@ export class ReportsListComponent implements OnInit{
         this.totalPages = response?.totalPages ?? 0;
         this.totalElements = response?.totalElements ?? 0;
         console.log('Reportes recibidos:', this.reportRows);
+        this.cdr.markForCheck();
       },
       error: (error) => {
         console.error('Error loading reports', error);
         this.toastService.showError('Error al cargar reportes: ' + error.message + '. Verifica backend.');
         this.reports = [];
         this.reportRows = [];
+        this.cdr.markForCheck();
       },
       complete: () => {
         this.isLoading = false;
+        this.cdr.markForCheck();
       }
     });
   }
 
   viewReport(id: number): void {
-    this.http.get<Report>(`${this.apiBase}/reports/${id}`).subscribe({
+    this.reportsApi.getById(id).subscribe({
       next: (report) => {
         const row = this.toRow(report);
         const detailHtml = this.autolavadoService.generateReportDetailHtml(report, {
@@ -138,7 +142,7 @@ export class ReportsListComponent implements OnInit{
       return;
     }
 
-    this.http.delete<void>(`${this.apiBase}/reports/${id}`).subscribe({
+    this.reportsApi.delete(id).subscribe({
       next: () => {
         this.loadReports();
         this.toastService.showSuccess('Reporte eliminado correctamente.');

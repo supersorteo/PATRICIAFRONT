@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, ChangeDetectorRef, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 import { Subject, takeUntil, combineLatest, BehaviorSubject, forkJoin, debounceTime, distinctUntilChanged, map, switchMap, of, catchError, Observable } from 'rxjs';
 import { Client, Space, Subsuelo, VehicleType } from '../../models/autolavado.model';
-import { AutolavadoService, PagedResponse } from '../../services/autolavado.service';
+import { AutolavadoService, ClientReservationsLookupResult, PagedResponse } from '../../services/autolavado.service';
 import { QrService } from '../../services/qr.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
@@ -18,6 +18,8 @@ interface ClientVehicleItem {
   model: string;
   plate?: string;
   notes?: string;
+  lastSeenTs?: number;
+  isLatest?: boolean;
   //category?: string;
   //price?: number;
 }
@@ -30,12 +32,29 @@ interface TransferSubsueloOption {
   freeSpaces: number;
 }
 
+interface AdminEditableClient {
+  id: number | string;
+  code?: string;
+  name: string;
+  dni?: string;
+  phoneIntl: string;
+  vehicle?: string;
+  plate?: string;
+  notes?: string;
+  category?: string;
+  price?: number | null;
+  paymentMethod?: string;
+  clover?: number | null;
+  spaceKey?: string | null;
+}
+
 @Component({
   selector: 'app-spaces',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, FormatPhonePipe],
   templateUrl:'./spaces.component.html',
-  styleUrls: ['./spaces.component.scss']
+  styleUrls: ['./spaces.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 
 export class SpacesComponent implements OnInit, OnDestroy {
@@ -73,6 +92,8 @@ monthlyServiceCountByDni = new Map<string, number>();
 monthlyServiceCountBatchLoading = false;
 monthlyServiceCountCacheMonthKey = '';
 isClosingDay = false;
+dniLookupSource: 'server' | 'local' | null = null;
+dniLookupMessage = '';
 
 
 clientReservationsHistory: Client[] = [];
@@ -85,7 +106,9 @@ private activeClientVehiclesKey: string | null = null;
   clientsAdminTotalPages = 0;
   clientsAdminTotalElements = 0;
   isLoadingClientsAdmin = false;
+  isSavingEditedAdminClient = false;
   private clientsAdminSearchTimer: any = null;
+  editedAdminClient: AdminEditableClient | null = null;
   //editedSpace: any = {}; // Nueva propiedad para datos del espacio editado
   editedSpace: Space | null = null;
   currentPage: number = 1;
@@ -308,6 +331,7 @@ this.autolavadoService.initializeDataPreferBackend();
 
     this.updateCurrentSubTitle();
     this.filterSpaces();
+    this.cdr.markForCheck();
 
 
   });
@@ -321,44 +345,43 @@ this.autolavadoService.initializeDataPreferBackend();
     this.cdr.detectChanges();
   }, 60000);*/
 
-  this.searchTermSubject
+this.searchTermSubject
   .pipe(takeUntil(this.destroy$))
   .subscribe(() => {
     this.currentPage = 1;
     this.filterSpaces();
+    this.cdr.markForCheck();
   });
 
 this.uiRefreshIntervalId = setInterval(() => {
-  this.cdr.detectChanges();
+  if (!this.shouldRefreshLiveSpaceTimes()) {
+    return;
+  }
+
+  this.cdr.markForCheck();
 }, 60000);
 
 
   // 3. CARGAR VEHÍCULOS DESDE BACKEND (siempre)
-  this.autolavadoService.loadVehicleTypes().subscribe({
+  const cachedVehicleTypes = this.autolavadoService.vehicleTypesSubject.value;
+  if (cachedVehicleTypes.length > 0) {
+    this.applyVehicleTypes(cachedVehicleTypes);
+  }
+  this.autolavadoService.loadVehicleTypes().pipe(takeUntil(this.destroy$)).subscribe({
     next: (vehicles: VehicleType[]) => {
-      this.vehicles = vehicles;
-      console.log('Tipos de vehículos cargados desde backend:', vehicles);
-      const currentVehicle = this.clientForm.get('vehicle')?.value;
-      if (!currentVehicle && vehicles.length > 0) {
-        const defaultVehicle = vehicles[0];
-        this.clientForm.patchValue({
-          vehicle: defaultVehicle.model,
-          price: defaultVehicle.price
-        });
-      }
+      this.applyVehicleTypes(vehicles);
+      console.log('Tipos de vehiculos cargados desde backend:', vehicles);
+      this.cdr.markForCheck();
     },
     error: (err) => {
       const cached = this.autolavadoService.vehicleTypesSubject.value;
       if (cached.length > 0) {
-        this.vehicles = cached;
-        const currentVehicle = this.clientForm.get('vehicle')?.value;
-        if (!currentVehicle) {
-          this.clientForm.patchValue({ vehicle: cached[0].model, price: cached[0].price });
-        }
+        this.applyVehicleTypes(cached);
       } else {
-        console.error('Error al cargar vehículos', err);
+        console.error('Error al cargar vehiculos', err);
         this.toastService.showError('Sin conexion: no hay tipos de vehiculos disponibles.');
       }
+      this.cdr.markForCheck();
     }
   });
 
@@ -375,6 +398,7 @@ this.uiRefreshIntervalId = setInterval(() => {
   )
   .subscribe((reservations) => {
     this.handleReservationsByDniResult(reservations);
+    this.cdr.markForCheck();
   });
 
 
@@ -400,6 +424,7 @@ this.uiRefreshIntervalId = setInterval(() => {
       totalArray: this.allClients.length,
       sample: this.allClients.slice(0, 3)
     });
+    this.cdr.markForCheck();
   });
 
 
@@ -410,6 +435,29 @@ this.uiRefreshIntervalId = setInterval(() => {
 
 
 
+
+
+private applyVehicleTypes(vehicles: VehicleType[]): void {
+  this.vehicles = [...(vehicles || [])].sort((a, b) => a.model.localeCompare(b.model));
+
+  const currentVehicle = this.clientForm.get('vehicle')?.value;
+  if (!currentVehicle && this.vehicles.length > 0) {
+    const defaultVehicle = this.vehicles[0];
+    this.clientForm.patchValue({
+      vehicle: defaultVehicle.model,
+      price: defaultVehicle.price
+    });
+  }
+}
+
+private shouldRefreshLiveSpaceTimes(): boolean {
+  const spacesArray = Object.values(this.spaces || {});
+  if (spacesArray.some(space => !!space?.occupied && !!space?.startTime)) {
+    return true;
+  }
+
+  return !!this.selectedSpace?.occupied && !!this.selectedSpace?.startTime;
+}
 
 ngAfterViewInit(): void {
   this.iti = intlTelInput(this.phoneInput.nativeElement, {
@@ -709,19 +757,20 @@ private loadMonthlyServiceCountForClient(client: Client): void {
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  this.autolavadoService.getMonthlyServiceCountByDni(dni, monthKey).subscribe({
+  this.autolavadoService.getMonthlyServiceCountByDni(dni, monthKey).pipe(takeUntil(this.destroy$)).subscribe({
     next: (count) => {
       this.monthlyServiceCountByKey.set(key, Number(count || 0));
       this.monthlyServiceCountLoadingKeys.delete(key);
 
       console.log('[MonthlyCount] loaded', { dni, key, monthKey, count });
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     },
     error: (err) => {
       this.monthlyServiceCountByKey.set(key, 0);
       this.monthlyServiceCountLoadingKeys.delete(key);
 
       console.warn('[MonthlyCount] error', { dni, key, err });
+      this.cdr.markForCheck();
     }
   });
 }
@@ -749,7 +798,7 @@ private preloadMonthlyServiceCountsForClients(clients: Client[]): void {
 
   const monthKey = this.monthlyServiceCountCacheMonthKey || this.getCurrentMonthKey();
 
-  this.autolavadoService.getMonthlyServiceCountsByDnis(missing, monthKey).subscribe({
+  this.autolavadoService.getMonthlyServiceCountsByDnis(missing, monthKey).pipe(takeUntil(this.destroy$)).subscribe({
     next: (counts) => {
       Object.entries(counts || {}).forEach(([dni, count]) => {
         this.monthlyServiceCountByDni.set(dni, Number(count || 0));
@@ -768,14 +817,14 @@ private preloadMonthlyServiceCountsForClients(clients: Client[]): void {
         requested: missing.length,
         received: Object.keys(counts || {}).length
       });
-
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     },
     error: (err) => {
       this.monthlyServiceCountBatchLoading = false;
       console.warn('[MonthlyCount][batch] error', err);
 
       missing.forEach(dni => this.monthlyServiceCountByDni.set(dni, 0));
+      this.cdr.markForCheck();
     }
   });
 }
@@ -978,36 +1027,21 @@ async saveNewClient() {
     next: (savedClient) => {
       this.isSavingNewClient = false;
       this.toastService.showSuccess('Cliente agregado correctamente.');
-
-      const modalElement = document.getElementById('newClientModal');
-      if (modalElement) {
-        const modalInstance = bootstrap.Modal.getInstance(modalElement);
-        if (modalInstance) {
-          modalInstance.hide();
-          setTimeout(() => {
-            const backdrop = document.querySelector('.modal-backdrop');
-            if (backdrop) backdrop.remove();
-            document.body.classList.remove('modal-open');
-          }, 300);
-        }
-      }
-
-      this.newClientForm.reset();
-      this.newPhoneIsValid = false;
-      this.newPhoneFlag = '';
-      this.newPhoneCode = '';
-      this.newPhoneCountry = '';
-
-      if (this.newIti) {
-        this.newIti.setNumber('');
-        this.newIti.setCountry('ar');
-      }
-
-      this.loadAllClientsFromBackend();
-      this.cdr.detectChanges();
+      this.closeAndResetNewClientModal();
+      this.clientsAdminPage = 0;
+      this.loadClientsAdminPageFromBackend();
     },
     error: (err) => {
       this.isSavingNewClient = false;
+      if (Number(err?.status || 0) === 0) {
+        const offlineClient = this.autolavadoService.addManualClientOffline(clientData);
+        this.autolavadoService.queueAddManualClientSync(clientData, String(offlineClient.id));
+        this.closeAndResetNewClientModal();
+        this.refreshClientsAdminFromLocalState();
+        this.toastService.showWarning('Cliente guardado localmente. Se sincronizara cuando vuelva la conexion.');
+        return;
+      }
+
       this.toastService.showError('Error al guardar: ' + (err.error?.message || 'Intenta de nuevo'));
     }
   });
@@ -1062,10 +1096,13 @@ private limpiarEspaciosDeDiasAnteriores(): void {
 
     // Llamar al método completo: limpia local, backend y RECARGA todo fresco
     this.autolavadoService.resetData().subscribe({
-      next: () => {
+      next: (result) => {
         console.log('Reset automático completado: espacios liberados y datos recargados');
         this.filterSpaces();
         this.cdr.detectChanges();
+        if (result?.offlineQueued) {
+          this.toastService.showWarning('Se aplico el reset localmente y quedo pendiente de sincronizacion con el servidor.');
+        }
       },
       error: (err) => {
         console.warn('Error en reset automático', err);
@@ -1085,7 +1122,7 @@ private loadDataFromBackend(): void {
     subsuelos: this.autolavadoService.loadSubsuelosFromBackend(),
     spaces: this.autolavadoService.loadSpacesFromBackend(),
     clients: this.autolavadoService.loadClientsFromBackend()
-  }).subscribe({
+  }).pipe(takeUntil(this.destroy$)).subscribe({
     next: ({ subsuelos, spaces, clients }) => {
       console.log('Datos cargados desde backend como respaldo');
 
@@ -1272,7 +1309,6 @@ openClientsDb(): void {
 closeClientsDb(): void {
   this.isClientsDbOpen = false;
   this.searchTermClients = '';
-  this.filteredClientsAdmin = [];
   this.clientsAdminPage = 0;
   this.clientsAdminTotalPages = 0;
   this.clientsAdminTotalElements = 0;
@@ -1290,6 +1326,8 @@ closeClientModal(): void {
   this.whatsappLink = '';
   this.showClientVehiclesModal = false;
   this.showFrequentClientModal = false;
+  this.dniLookupSource = null;
+  this.dniLookupMessage = '';
 
   if (this.iti) {
     this.iti.setCountry('ar');
@@ -1371,7 +1409,7 @@ get showFrequentClientButton(): boolean {
 
 
 openFrequentClientModal(): void {
-  this.autolavadoService.getAllClientsFromBackend().subscribe({
+  this.autolavadoService.getAllClientsFromBackend().pipe(takeUntil(this.destroy$)).subscribe({
     next: (clients) => {
       this.allClients = clients || [];
       const visits = this.getVisitsForCurrentClientThisMonth();
@@ -1391,12 +1429,14 @@ openFrequentClientModal(): void {
           spaceKey: v.spaceKey
         }))
       );
+      this.cdr.markForCheck();
     },
     error: (err) => {
       console.error('Error cargando clientes para modal frecuente', err);
       const visits = this.getVisitsForCurrentClientThisMonth();
       this.frequentClientVisitsSnapshot = visits;
       this.showFrequentClientModal = true;
+      this.cdr.markForCheck();
     }
   });
 }
@@ -1669,7 +1709,7 @@ openClientVehiclesModal(): void {
   this.isLoadingClientVehiclesModal = true;
   this.showClientVehiclesModal = true;
 
-  this.fetchReservationsByDni$(dni).subscribe({
+  this.fetchReservationsByDni$(dni).pipe(takeUntil(this.destroy$)).subscribe({
     next: (reservations) => {
       const rows = this.sortReservationsDesc(reservations);
       const latest = rows[0];
@@ -2046,7 +2086,17 @@ private getClientIdentityKeyForUI(client: Client): string {
 private getClientSortTsForUI(client: Client): number {
   return this.toTimestamp(client.entryTimestamp)
     ?? this.toTimestamp(client.exitTimestamp)
+    ?? this.extractTempEntityTimestamp(client.id)
     ?? Number(client.id || 0);
+}
+
+private extractTempEntityTimestamp(id: any): number | null {
+  const raw = (id || '').toString();
+  const match = raw.match(/temp(?:-manual)?-(\d+)-/);
+  if (!match) return null;
+
+  const ts = Number(match[1]);
+  return Number.isFinite(ts) ? ts : null;
 }
 
 private dedupeClientsForUI(clients: Client[]): Client[] {
@@ -2099,7 +2149,7 @@ loadAllClientsFromBackend00(): void {
 }
 
 loadAllClientsFromBackend(): void {
-  this.autolavadoService.getUniqueClientsFromBackend().subscribe({
+  this.autolavadoService.getUniqueClientsFromBackend().pipe(takeUntil(this.destroy$)).subscribe({
     next: (clients) => {
       this.allClients = clients;
       this.filteredClientsAdmin = clients;
@@ -2109,6 +2159,7 @@ loadAllClientsFromBackend(): void {
       this.preloadMonthlyServiceCountsForClients(clients);
 
       console.log('Clientes únicos cargados desde backend:', clients);
+      this.cdr.markForCheck();
     },
     error: (err) => {
       console.error('Error cargando clientes', err);
@@ -2125,7 +2176,7 @@ loadClientsAdminPageFromBackend(): void {
     this.clientsAdminPage,
     this.clientsAdminPageSize,
     this.searchTermClients
-  ).subscribe({
+  ).pipe(takeUntil(this.destroy$)).subscribe({
     next: (response: PagedResponse<Client>) => {
       const clients = response?.content || [];
 
@@ -2146,15 +2197,79 @@ loadClientsAdminPageFromBackend(): void {
         totalElements: this.clientsAdminTotalElements,
         content: clients.length
       });
+      this.cdr.markForCheck();
     },
     error: (err) => {
       console.error('Error cargando clientes', err);
+      if (Number(err?.status || 0) === 0) {
+        this.refreshClientsAdminFromLocalState();
+        this.toastService.showWarning('Sin conexion con el servidor. Se muestran los clientes locales disponibles.');
+        this.cdr.markForCheck();
+        return;
+      }
+
       this.toastService.showError('No se pudieron cargar los clientes.');
     },
     complete: () => {
       this.isLoadingClientsAdmin = false;
+      this.cdr.markForCheck();
     }
   });
+}
+
+private refreshClientsAdminFromLocalState(): void {
+  const localClients = this.dedupeClientsForUI(Object.values(this.autolavadoService.clientsSubject.value || {}));
+  this.allClients = localClients;
+  this.clientsAdminPage = 0;
+  this.applyClientsAdminLocalPage(localClients);
+
+  this.ensureMonthlyServiceCountCacheForCurrentMonth();
+  this.monthlyServiceCountByDni.clear();
+  this.preloadMonthlyServiceCountsForClients(this.filteredClientsAdmin);
+}
+
+private applyClientsAdminLocalPage(sourceClients: Client[]): void {
+  const term = (this.searchTermClients || '').trim().toLowerCase();
+  const filtered = (sourceClients || []).filter(client => {
+    if (!term) return true;
+
+    return [
+      client.id,
+      client.name,
+      client.dni,
+      client.phoneIntl,
+      client.vehicle,
+      client.plate,
+      client.code,
+      client.spaceKey
+    ].some(value => (value || '').toString().toLowerCase().includes(term));
+  });
+
+  const safeTotalPages = Math.max(1, Math.ceil(filtered.length / this.clientsAdminPageSize));
+  this.clientsAdminTotalElements = filtered.length;
+  this.clientsAdminTotalPages = safeTotalPages;
+  this.clientsAdminPage = Math.min(this.clientsAdminPage, safeTotalPages - 1);
+
+  const start = this.clientsAdminPage * this.clientsAdminPageSize;
+  const end = start + this.clientsAdminPageSize;
+  this.filteredClientsAdmin = filtered.slice(start, end);
+}
+
+private closeAndResetNewClientModal(): void {
+  const modalElement = document.getElementById('newClientModal');
+  if (modalElement) {
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (modalInstance) {
+      modalInstance.hide();
+      setTimeout(() => {
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.remove();
+        document.body.classList.remove('modal-open');
+      }, 300);
+    }
+  }
+
+  this.resetNewClientForm();
 }
 
 get clientsAdminPageLabel(): number {
@@ -2251,9 +2366,121 @@ getTimeInSpace(startTime: number | null): string {
 }
 
 editClient(client: Client): void {
-  this.toastService.showInfo(`Edicion de cliente ID ${client.id} pendiente de implementar.`, 4500);
-  console.log('Editar cliente:', client);
-  // Aquí puedes abrir otro modal con formulario para editar
+  this.editedAdminClient = {
+    id: client.id,
+    code: client.code,
+    name: client.name || '',
+    dni: client.dni || '',
+    phoneIntl: client.phoneIntl || '',
+    vehicle: client.vehicle || '',
+    plate: client.plate || '',
+    notes: client.notes || '',
+    category: client.category || '',
+    price: client.price ?? null,
+    paymentMethod: client.paymentMethod || '',
+    clover: client.clover ?? null,
+    spaceKey: client.spaceKey || null
+  };
+
+  const modal = new bootstrap.Modal(document.getElementById('editAdminClientModal'));
+  modal.show();
+}
+
+async saveEditedAdminClient(): Promise<void> {
+  if (!this.editedAdminClient) {
+    return;
+  }
+
+  const clientId = this.editedAdminClient.id;
+  const clientIdText = String(clientId || '');
+
+  const payload = {
+    name: (this.editedAdminClient.name || '').trim(),
+    dni: (this.editedAdminClient.dni || '').trim() || null,
+    phoneIntl: (this.editedAdminClient.phoneIntl || '').trim(),
+    vehicle: (this.editedAdminClient.vehicle || '').trim() || null,
+    plate: (this.editedAdminClient.plate || '').trim() || null,
+    notes: (this.editedAdminClient.notes || '').trim() || null,
+    category: (this.editedAdminClient.category || '').trim() || null,
+    price: this.editedAdminClient.price ?? null,
+    paymentMethod: (this.editedAdminClient.paymentMethod || '').trim() || null,
+    clover: this.editedAdminClient.clover ?? null
+  };
+
+  if (!payload.name || !payload.phoneIntl) {
+    this.toastService.showWarning('Nombre y telefono son obligatorios para editar el cliente.');
+    return;
+  }
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Guardar cambios del cliente',
+    message: `Deseas actualizar los datos de ${payload.name}?`,
+    confirmText: 'Guardar cambios',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (!confirmed) {
+    this.toastService.showInfo('Edicion de cliente cancelada.');
+    return;
+  }
+
+  this.isSavingEditedAdminClient = true;
+
+  if (clientIdText.startsWith('temp-manual-')) {
+    this.isSavingEditedAdminClient = false;
+    this.autolavadoService.updateClientOffline(clientId, payload);
+    const updatedPending = this.autolavadoService.updatePendingManualClientSync(clientIdText, payload);
+    this.closeEditAdminClientModal();
+    this.refreshClientsAdminFromLocalState();
+    this.filterSpaces();
+
+    if (updatedPending) {
+      this.toastService.showWarning('Cliente offline actualizado localmente. El alta pendiente se sincronizara con estos cambios.');
+    } else {
+      this.toastService.showWarning('Cliente local actualizado, pero no se encontro una alta pendiente para sincronizar.');
+    }
+    return;
+  }
+
+  this.autolavadoService.updateClientInBackend(clientId, payload).subscribe({
+    next: (updatedClient) => {
+      this.isSavingEditedAdminClient = false;
+      this.autolavadoService.updateClientOffline(clientId, updatedClient || payload);
+      this.closeEditAdminClientModal();
+      this.loadClientsAdminPageFromBackend();
+      this.filterSpaces();
+      this.toastService.showSuccess('Cliente actualizado correctamente.');
+    },
+    error: (err) => {
+      this.isSavingEditedAdminClient = false;
+
+      if (Number(err?.status || 0) === 0) {
+        this.autolavadoService.updateClientOffline(clientId, payload);
+        this.autolavadoService.queueUpdateClientSync(clientId, payload);
+        this.closeEditAdminClientModal();
+        this.refreshClientsAdminFromLocalState();
+        this.filterSpaces();
+        this.toastService.showWarning('Cliente actualizado localmente. Se sincronizara cuando vuelva la conexion.');
+        return;
+      }
+
+      this.toastService.showError('No se pudo actualizar el cliente: ' + (err?.error?.message || 'Intenta de nuevo'));
+    }
+  });
+}
+
+closeEditAdminClientModal(): void {
+  const modalElement = document.getElementById('editAdminClientModal');
+  if (modalElement) {
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (modalInstance) {
+      modalInstance.hide();
+    }
+  }
+
+  this.editedAdminClient = null;
+  this.isSavingEditedAdminClient = false;
 }
 
 
@@ -2280,7 +2507,7 @@ async deleteClientWithConfirm(clientId: any): Promise<void> {
   const shouldGoPreviousPage = this.filteredClientsAdmin.length === 1 && this.clientsAdminPage > 0;
 
   this.autolavadoService.deleteClientFromBackend(clientId).subscribe({
-    next: () => {
+    next: (result) => {
       console.log(`Cliente ${clientId} eliminado correctamente`);
 
       if (shouldGoPreviousPage) {
@@ -2288,7 +2515,6 @@ async deleteClientWithConfirm(clientId: any): Promise<void> {
       }
       this.loadClientsAdminPageFromBackend();
       this.filterSpaces();
-      this.cdr.detectChanges();
 
       this.toastService.showSuccess('Cliente eliminado correctamente');
     },
@@ -2403,7 +2629,6 @@ private filterSpaces(): void {
     try {
       this.autolavadoService.addSubsuelo();
       this.filterSpaces();
-      this.cdr.detectChanges();
       this.toastService.showSuccess('Subsuelo agregado correctamente.');
     } catch (error: any) {
       this.toastService.showError('No se pudo agregar el subsuelo: ' + (error?.message || error));
@@ -2446,7 +2671,6 @@ private async confirmEditSubsueloWithConfirm(): Promise<void> {
   try {
     this.autolavadoService.updateSubsuelo(this.currentSubId, trimmedLabel);
     this.filterSpaces();
-    this.cdr.detectChanges();
     this.hideModal('editSubsueloModal');
     this.toastService.showSuccess('Subsuelo actualizado correctamente.');
   } catch (error: any) {
@@ -2485,7 +2709,6 @@ private async confirmEditSubsueloWithConfirm(): Promise<void> {
     try {
       this.autolavadoService.addSpacesToCurrent(this.addSpacesCount);
       this.filterSpaces();
-      this.cdr.detectChanges();
       this.toastService.showSuccess(`${this.addSpacesCount} espacios agregados correctamente.`);
     } catch (error: any) {
       this.toastService.showError('No se pudieron agregar los espacios: ' + (error?.message || error));
@@ -3075,10 +3298,100 @@ private mapClientVehiclesFromBackend(client: Client): ClientVehicleItem[] {
   }));
 }
 
-private hydrateClientFormFromReservation(client: Client): void {
+private collectVehiclesFromReservations(reservations: Client[]): ClientVehicleItem[] {
+  const dedup = new Map<string, ClientVehicleItem>();
+  const latestReservation = this.sortReservationsDesc(reservations || [])[0] || null;
+  const latestReservationTs = latestReservation ? this.getReservationTs(latestReservation) : 0;
+
+  for (const reservation of reservations || []) {
+    const reservationTs = this.getReservationTs(reservation);
+    const directVehicles = this.mapClientVehiclesFromBackend(reservation);
+
+    if (directVehicles.length > 0) {
+      for (const vehicle of directVehicles) {
+        this.upsertCollectedVehicle(dedup, vehicle, reservationTs, latestReservationTs);
+      }
+    }
+
+    const fallbackModel = (reservation.vehicle || '').toString().trim();
+    const fallbackPlate = (reservation.plate || '').toString().trim();
+    const fallbackNotes = (reservation.notes || '').toString().trim();
+    if (!fallbackModel) {
+      continue;
+    }
+
+    this.upsertCollectedVehicle(dedup, {
+      model: fallbackModel,
+      plate: fallbackPlate,
+      notes: fallbackNotes
+    }, reservationTs, latestReservationTs);
+  }
+
+  return Array.from(dedup.values()).sort((a, b) => {
+    const aLatest = a.isLatest ? 1 : 0;
+    const bLatest = b.isLatest ? 1 : 0;
+    if (aLatest !== bLatest) {
+      return bLatest - aLatest;
+    }
+
+    const aTs = a.lastSeenTs || 0;
+    const bTs = b.lastSeenTs || 0;
+    if (aTs !== bTs) {
+      return bTs - aTs;
+    }
+
+    return (a.model || '').localeCompare(b.model || '');
+  });
+}
+
+private upsertCollectedVehicle(
+  dedup: Map<string, ClientVehicleItem>,
+  vehicle: ClientVehicleItem,
+  reservationTs: number,
+  latestReservationTs: number
+): void {
+  const key = this.buildClientVehicleIdentityKey(vehicle);
+  if (!key) {
+    return;
+  }
+
+  const previous = dedup.get(key);
+  const merged: ClientVehicleItem = {
+    ...(previous || {}),
+    model: vehicle.model || previous?.model || '',
+    plate: vehicle.plate || previous?.plate || '',
+    notes: vehicle.notes || previous?.notes || '',
+    lastSeenTs: Math.max(previous?.lastSeenTs || 0, reservationTs || 0),
+    isLatest: (previous?.isLatest || false) || reservationTs === latestReservationTs
+  };
+
+  dedup.set(key, merged);
+}
+
+private buildClientVehicleIdentityKey(vehicle: ClientVehicleItem | null | undefined): string {
+  const model = this.normalizeText(vehicle?.model || '').toLowerCase();
+  const plate = this.normalizeText(vehicle?.plate || '').toUpperCase();
+  const notes = this.normalizeText(vehicle?.notes || '').toLowerCase();
+
+  if (!model) {
+    return '';
+  }
+
+  if (plate) {
+    return `${model}|${plate}`;
+  }
+
+  if (notes) {
+    return `${model}|${notes}`;
+  }
+
+  return model;
+}
+
+private hydrateClientFormFromReservation(client: Client, reservations: Client[] = []): void {
   if (!client) return;
 
-  const backendVehicles = this.mapClientVehiclesFromBackend(client);
+  const backendVehicles = this.collectVehiclesFromReservations(reservations.length ? reservations : [client]);
   this.clientVehiclesList = backendVehicles;
 
   if (backendVehicles.length > 0) {
@@ -3122,6 +3435,13 @@ private handleReservationsByDniResult(reservations: Client[]): void {
   if (!rows.length) {
     this.existingClientId = null;
     this.clearClientVehicleWorkingList();
+    if (this.dniLookupSource === 'local') {
+      this.dniLookupMessage = 'Sin conexion. No se encontraron coincidencias en el cache local para este DNI.';
+    } else if (this.clientForm.get('dni')?.value) {
+      this.dniLookupMessage = 'No se encontraron reservas previas para este DNI.';
+    } else {
+      this.dniLookupMessage = '';
+    }
     return;
   }
 
@@ -3136,7 +3456,11 @@ private handleReservationsByDniResult(reservations: Client[]): void {
     this.toastService.showWarning(`Cliente encontrado: ${client.name}. Ya tiene una reserva activa y se creara una nueva reserva para otro vehiculo.`, 5500);
   }
 
-  this.hydrateClientFormFromReservation(client);
+  this.hydrateClientFormFromReservation(client, rows);
+
+  this.dniLookupMessage = this.dniLookupSource === 'local'
+    ? `Cliente recuperado desde cache local. Se sincronizara con el servidor cuando vuelva la conexion.`
+    : `Cliente recuperado desde el servidor.`;
 
   console.log('[DNI] cliente hidratado desde backend', {
     dni: client.dni,
@@ -3151,11 +3475,19 @@ private fetchReservationsByDni$(dni: string): Observable<Client[]> {
 
   if (safeDni.length < 7) {
     this.existingClientId = null;
+    this.dniLookupSource = null;
+    this.dniLookupMessage = '';
     return of([] as Client[]);
   }
 
-  return this.autolavadoService.getClientReservationsByDni(safeDni).pipe(
+  return this.autolavadoService.getClientReservationsByDniWithSource(safeDni).pipe(
+    map((result: ClientReservationsLookupResult) => {
+      this.dniLookupSource = result.source;
+      return result.reservations || [];
+    }),
     catchError((err) => {
+      this.dniLookupSource = null;
+      this.dniLookupMessage = '';
       console.warn('[DNI] Error obteniendo reservas por DNI', err);
       return of([] as Client[]);
     })
@@ -3381,9 +3713,26 @@ saveNewVehicle(): void {
       });
 
       this.toastService.showSuccess(`Vehículo "${newType.model}" (${newType.category}) creado — $${newType.price.toLocaleString('es-AR')}`);
+      this.cdr.markForCheck();
     },
     error: (err) => {
-      console.error('Error creando vehículo:', err);
+      console.error('Error creando vehiculo:', err);
+      if (Number(err?.status || 0) === 0) {
+        const offlineType = this.autolavadoService.createVehicleTypeOffline(payload);
+        this.autolavadoService.queueCreateVehicleTypeSync(payload);
+        this.vehicles = [...this.autolavadoService.vehicleTypesSubject.value];
+        this.closeAddVehicleModal();
+
+        this.clientForm.patchValue({
+          vehicle: offlineType.model,
+          price: offlineType.price
+        });
+
+        this.toastService.showWarning(`Vehiculo "${offlineType.model}" creado localmente. Se sincronizara cuando vuelva la conexion.`);
+        this.cdr.markForCheck();
+        return;
+      }
+
       this.toastService.showError('Error al agregar el vehiculo.');
     }
   });
@@ -3427,9 +3776,10 @@ async deleteVehicle(id: number, event: Event): Promise<void> {
   if (!confirmed) return;
 
   this.autolavadoService.deleteVehicleType(id).subscribe({
-    next: () => {
+    next: (result) => {
       this.vehicles = this.vehicles.filter(v => v.id !== id);
       this.toastService.showSuccess('Vehiculo eliminado.');
+      this.cdr.markForCheck();
     },
     error: (err) => {
       console.error(err);
@@ -3487,6 +3837,7 @@ copyMessage0(): void {
 copyMessage(): void {
   navigator.clipboard.writeText(this.whatsappMessage).then(() => {
     this.hasCopiedMessage = true;
+    this.cdr.markForCheck();
     this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   }).catch(err => {
     console.error('Error copying message:', err);
@@ -3644,7 +3995,20 @@ async releaseSpace(): Promise<void> {
     return;
   }
 
-  this.autolavadoService.releaseSpace(this.selectedSpaceKey).subscribe({
+  const releasedClient = this.selectedClient ? { ...this.selectedClient } : null;
+  const release$ = this.autolavadoService.releaseSpace(this.selectedSpaceKey);
+
+  if (releasedClient) {
+    this.whatsappMessageOccupied = this.autolavadoService.buildWhatsAppMessageRelease(releasedClient);
+    this.hasCopiedMessageOccupied = false;
+    this.showWhatsAppModalOccupied = true;
+    this.cdr.markForCheck();
+  }
+
+  this.filterSpaces();
+  this.hideModal('occupiedModal');
+
+  release$.subscribe({
       next: () => {
         console.log('Espacio liberado y datos sincronizados');
 
@@ -3654,25 +4018,18 @@ async releaseSpace(): Promise<void> {
           this.saveSentWhatsappState(); // Actualizar persistencia
         }
 
-        // Si habia cliente, generar mensaje de liberacion y abrir modal
-        if (this.selectedClient) {
-          this.whatsappMessageOccupied = this.autolavadoService.buildWhatsAppMessageRelease(this.selectedClient);
-          this.hasCopiedMessageOccupied = false;
-          this.showWhatsAppModalOccupied = true;
-        }
-
-
-        this.filterSpaces();
-        this.cdr.detectChanges();
-        this.hideModal('occupiedModal');
-
-
         this.toastService.showSuccess('Espacio liberado correctamente');
       },
       error: (err) => {
         console.warn('Error liberando espacio', err);
-        this.hideModal('occupiedModal');
-        this.toastService.showWarning('Espacio liberado localmente. Se sincronizara cuando vuelva la conexion.');
+        if (Number(err?.status || 0) === 0) {
+          this.toastService.showWarning('Espacio liberado localmente. Se sincronizara cuando vuelva la conexion.');
+          return;
+        }
+
+        this.showWhatsAppModalOccupied = false;
+        this.toastService.showError('No se pudo liberar el espacio. Se revirtio el cambio.');
+        this.cdr.markForCheck();
       }
     });
 }
@@ -3693,10 +4050,6 @@ async releaseSpace(): Promise<void> {
 
 
 
-
-
-
-
 openCerrarDiaModal(): void {
   const hoy = new Date().toLocaleDateString('es-AR');
   this.cerrarDiaModalMessage =
@@ -3713,68 +4066,7 @@ confirmCerrarDia(): void {
   this.cerrarDia();
 }
 
-cerrarDia0(): void {
-  const hoy = new Date().toLocaleDateString('es-AR');
-  console.log('Iniciando cierre del dia...');
 
-  this.autolavadoService.resetData().subscribe({
-    next: () => {
-      console.log('Dia cerrado correctamente');
-      this.sentReleaseWhatsappBySpace.clear();
-      localStorage.removeItem(this.WHATSAPP_SENT_STORAGE_KEY);
-
-      // Actualizar vista
-      this.filterSpaces();
-      this.cdr.detectChanges();
-
-      this.cerrarDiaResultMessage =
-        `Dia ${hoy} cerrado.\nTodos los espacios estan libres.\nDatos sincronizados con el servidor.`;
-      this.showModal('closeDayResultModal');
-    },
-    error: (err) => {
-      console.warn('Error en el cierre del dia', err);
-      this.cerrarDiaResultMessage =
-        'Cerrado localmente. Intenta de nuevo cuando haya conexion.';
-      this.showModal('closeDayResultModal');
-    }
-  });
-}
-
-cerrarDia1(): void {
-  const hoy = new Date().toLocaleDateString('es-AR');
-  console.log('[CloseDay] Iniciando cierre del dia (generar reporte final + reset)...');
-
-  this.autolavadoService.upsertDailyReportSnapshotBeforeClose$().pipe(
-    switchMap((report) => {
-      console.log('[CloseDay] Resultado reporte previo al cierre', report ? {
-        reportId: report.id,
-        timestamp: report.timestamp
-      } : 'Sin servicios del día (sin reporte)');
-      return this.autolavadoService.resetData();
-    })
-  ).subscribe({
-    next: () => {
-      console.log('[CloseDay] Dia cerrado correctamente');
-
-      this.sentReleaseWhatsappBySpace.clear();
-      localStorage.removeItem(this.WHATSAPP_SENT_STORAGE_KEY);
-
-      this.filterSpaces();
-      this.cdr.detectChanges();
-
-      this.cerrarDiaResultMessage =
-        `Dia ${hoy} cerrado.\nSe generó/actualizó el reporte diario final y luego se liberaron los espacios.`;
-      this.showModal('closeDayResultModal');
-    },
-    error: (err) => {
-      console.warn('[CloseDay] Error en generación de reporte o cierre', err);
-
-      this.cerrarDiaResultMessage =
-        'No se pudo completar el cierre del día porque falló la generación/actualización del reporte o el reset. No se ejecutó el cierre completo.';
-      this.showModal('closeDayResultModal');
-    }
-  });
-}
 
 
 cerrarDia(): void {
@@ -3797,7 +4089,6 @@ cerrarDia(): void {
 
       this.loadAllClientsFromBackend();
       this.filterSpaces();
-      this.cdr.detectChanges();
 
       this.cerrarDiaResultMessage =
         `Día ${hoy} cerrado.\n` +
@@ -3808,6 +4099,11 @@ cerrarDia(): void {
        this.isClosingDay = false;
     },
     error: (err) => {
+      if (Number(err?.status || 0) === 0) {
+        this.handleOfflineCloseDayFallback(hoy);
+        return;
+      }
+
       console.warn('[CloseDay] Error en cierre manual unificado', err);
 
       this.cerrarDiaResultMessage =
@@ -3821,9 +4117,35 @@ cerrarDia(): void {
 }
 
 
+private handleOfflineCloseDayFallback(hoy: string): void {
+  this.autolavadoService.resetData().subscribe({
+    next: (result) => {
+      this.sentReleaseWhatsappBySpace.clear();
+      localStorage.removeItem(this.WHATSAPP_SENT_STORAGE_KEY);
+
+      this.filterSpaces();
+
+      this.cerrarDiaResultMessage = result?.offlineQueued
+        ? `Día ${hoy} cerrado localmente.\nNo se pudo finalizar el reporte diario en el servidor porque no hay conexión.\nEl reset quedó pendiente de sincronización.`
+        : `Día ${hoy} cerrado localmente.\nEl reporte final del servidor no pudo generarse en este intento, pero los espacios ya quedaron liberados y sincronizados.`;
+
+      this.showModal('closeDayResultModal');
+      this.isClosingDay = false;
+    },
+    error: (resetErr) => {
+      console.warn('[CloseDay] Error en fallback offline del cierre manual', resetErr);
+      this.cerrarDiaResultMessage =
+        'No se pudo completar el cierre del día en el servidor y tampoco se pudo aplicar el reset local de forma segura.';
+      this.showModal('closeDayResultModal');
+      this.isClosingDay = false;
+    }
+  });
+}
+
+
  deleteSpace(): void {
-    void this.deleteSpaceWithConfirm();
-  }
+  void this.deleteSpaceWithConfirm();
+}
 
   private async deleteSpaceWithConfirm(): Promise<void> {
     const confirmed = await this.confirmService.confirm({
@@ -3875,7 +4197,6 @@ private async deleteSubsueloWithConfirm(): Promise<void> {
   try {
     this.autolavadoService.deleteSubsuelo(this.currentSubId);
     this.filterSpaces();
-    this.cdr.detectChanges();
     this.toastService.showSuccess('Subsuelo eliminado correctamente.');
   } catch (error: any) {
     this.toastService.showError('Error al eliminar subsuelo: ' + (error?.message || error));
@@ -3912,7 +4233,6 @@ private async deleteSpacesWithConfirm(): Promise<void> {
   try {
     this.autolavadoService.deleteSpacesFromCurrent(this.addSpacesCount);
     this.filterSpaces();
-    this.cdr.detectChanges();
     this.currentPage = 1;
     this.toastService.showSuccess(`${this.addSpacesCount} espacios eliminados correctamente.`);
   } catch (error: any) {
@@ -3934,7 +4254,6 @@ goToPage(page: number): void {
   if (page >= 1 && page <= this.totalPages) {
     this.currentPage = page;
     this.filterSpaces();
-    this.cdr.detectChanges();
   }
 }
 
@@ -4083,7 +4402,6 @@ confirmTransferSpaceSelection(): void {
       next: () => {
         console.log('Espacio transferido en backend');
         this.filterSpaces();
-        this.cdr.detectChanges();
         this.isSubmittingTransferSpace = false;
         this.closeTransferSpaceModal();
         this.toastService.showSuccess(`Espacio transferido correctamente a ${targetOption?.label || newSubsuelo}.`);
@@ -4091,7 +4409,6 @@ confirmTransferSpaceSelection(): void {
       error: (err) => {
         console.warn('Error transferiendo en backend (funciona offline)', err);
         this.filterSpaces();
-        this.cdr.detectChanges();
         this.isSubmittingTransferSpace = false;
         this.closeTransferSpaceModal();
         this.toastService.showWarning('Espacio transferido localmente. Se sincronizara cuando vuelva la conexion.');
@@ -4123,6 +4440,7 @@ closeWhatsAppModalOccupied(): void {
 copyMessageOccupied(): void {
   navigator.clipboard.writeText(this.whatsappMessageOccupied).then(() => {
     this.hasCopiedMessageOccupied = true;
+    this.cdr.markForCheck();
     this.toastService.showSuccess('Mensaje copiado al portapapeles.');
   }).catch(err => {
     console.error('Error copying message:', err);
@@ -4189,11 +4507,28 @@ trackBySpaceKey(index: number, space: Space): string | number {
 }
 
 trackByClientVehicleModel0(index: number, item: ClientVehicleItem): string | number {
-  return this.normalizeVehicleModel(item?.model) || index;
+  const model = (item?.model || '').toString().trim().toLowerCase();
+  return model || index;
 }
 
 trackByClientVehicleModel(index: number, item: ClientVehicleItem): string | number {
-  return (item?.model || '').toString().trim().toLowerCase() || index;
+  const model = (item?.model || '').toString().trim().toLowerCase();
+  const plate = (item?.plate || '').toString().trim().toUpperCase();
+  const notes = (item?.notes || '').toString().trim().toLowerCase();
+
+  if (!model) {
+    return index;
+  }
+
+  if (plate) {
+    return `${model}|${plate}`;
+  }
+
+  if (notes) {
+    return `${model}|${notes}`;
+  }
+
+  return model;
 }
 
 

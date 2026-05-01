@@ -297,6 +297,175 @@
       font-weight: 600;
     }
 
+    // Stats modal — misma estructura que ranking-modal
+    .stats-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1080;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .stats-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.78);
+    }
+
+    .stats-modal__content {
+      position: relative;
+      z-index: 1;
+      width: min(680px, 100%);
+      max-height: 90vh;
+      background: #000000;
+      border: 1px solid #2b2b2b;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stats-modal__header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #2b2b2b;
+      background: #0b1220;
+    }
+
+    .stats-modal__body {
+      padding: 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .stats-modal__mode-switch .btn {
+      border-radius: 10px;
+      min-height: 44px;
+      border-width: 1px;
+    }
+
+    .stats-modal__filters {
+      padding: 1rem;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at top left, rgba(250, 204, 21, 0.08), transparent 34%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.94));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 16px 34px rgba(2, 6, 23, 0.28);
+    }
+
+    .stats-modal__filter-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.8rem;
+    }
+
+    .stats-modal__filter-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fbbf24;
+    }
+
+    .stats-modal__filter-hint {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      line-height: 1.35;
+    }
+
+    .stats-modal__selector-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
+    }
+
+    .stats-modal__selector-card {
+      padding: 0.8rem;
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.55);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+
+    .stats-modal__selector-title {
+      display: inline-flex;
+      margin-bottom: 0.45rem;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+    }
+
+    .stats-modal__filters .input-group-text {
+      min-width: 46px;
+      justify-content: center;
+      background: #0f172a;
+    }
+
+    .stats-modal__filters .form-control,
+    .stats-modal__filters .form-select {
+      min-height: 44px;
+      border-radius: 10px;
+      background: #020617;
+      border-color: rgba(148, 163, 184, 0.24);
+      color: #e2e8f0;
+      box-shadow: none;
+    }
+
+    .stats-modal__filters .form-select:focus,
+    .stats-modal__filters .form-control:focus {
+      border-color: rgba(250, 204, 21, 0.7);
+      box-shadow: 0 0 0 0.18rem rgba(250, 204, 21, 0.12);
+    }
+
+    .stats-modal__summary-card {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .stats-modal__summary-card--services {
+      background: rgba(234, 179, 8, 0.12);
+      border: 1px solid rgba(234, 179, 8, 0.4);
+    }
+
+    .stats-modal__summary-card--amount {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+
+    .stats-modal__summary-body {
+      padding: 0.85rem 0.9rem;
+    }
+
+    .stats-modal__summary-number {
+      font-size: 1.8rem;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .stats-modal__summary-label {
+      margin-top: 0.35rem;
+      font-size: 0.78rem;
+      line-height: 1.2;
+    }
+
+    @media (max-width: 767.98px) {
+      .stats-modal__selector-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .table-dark.table-striped > tbody > tr.paid-row > * {
       background-color: #4a1f1f !important;
     }

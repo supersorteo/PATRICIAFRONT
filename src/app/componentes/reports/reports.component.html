@@ -1,10 +1,10 @@
- <div class="row mb-4">
+﻿ <div class="row mb-4">
       <div class="col-12">
-        <h2 class="h4 mb-3">Reportes y Estadísticas</h2>
+        <h2 class="h4 mb-3">Reportes y Estadisticas</h2>
       </div>
     </div>
 
-    <!-- Estadísticas Generales -->
+    <!-- Estadisticas Generales -->
     <div class="row g-3 mb-4">
 
 
@@ -39,7 +39,7 @@
         <div class="card stats-card">
           <div class="card-body text-center">
             <div class="stats-number text-warning">{{occupancyRate}}%</div>
-            <div class="stats-label">Ocupación Actual</div>
+            <div class="stats-label">Ocupacion Actual</div>
           </div>
         </div>
       </div>
@@ -48,7 +48,7 @@
     <div class="card stats-card">
       <div class="card-body text-center">
         <div class="stats-number text-primary">{{dailyClients.length}}</div>
-        <div class="stats-label">Servicios del Día</div>
+        <div class="stats-label">Servicios del Dia</div>
       </div>
     </div>
   </div>
@@ -88,7 +88,7 @@
                 <th>Total</th>
                 <th>Ocupados</th>
                 <th>Libres</th>
-                <th>% Ocupación</th>
+                <th>% Ocupacion</th>
               </tr>
             </thead>
             <tbody>
@@ -123,8 +123,8 @@
 <div class="card mb-4">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <!--h5-- class="card-title mb-0">Servicios del día ({{filteredClients.length}})</!--h5-->
-      <h5 class="card-title mb-0">Servicios del día {{todayDate()}} ({{dailyClients.length}})</h5>
+      <!--h5-- class="card-title mb-0">Servicios del dia ({{filteredClients.length}})</!--h5-->
+      <h5 class="card-title mb-0">Servicios del dia {{todayDate()}} ({{dailyClients.length}})</h5>
       <div class="input-group" style="width: 300px;">
         <input type="text" class="form-control" placeholder="Buscar cliente..." [(ngModel)]="searchTerm" (input)="onSearchClients()">
       </div>
@@ -133,12 +133,12 @@
       <table class="table table-dark table-striped">
         <thead>
           <tr>
-            <th>Código</th>
+            <th>Codigo</th>
             <th>Cliente</th>
             <th>Espacio</th>
-            <th>Teléfono</th>
-            <th>Vehículo</th>
-            <th>Categoría</th>
+            <th>Telefono</th>
+            <th>Vehiculo</th>
+            <th>Categoria</th>
             <th>Precio</th>
             <th>Tiempo</th>
             <th>Salida</th>
@@ -180,7 +180,7 @@
         'bg-danger': client.category === 'ALTO PORTE',
         'bg-secondary': client.category === 'MOTO' || !client.category
       }">
-        {{ client.category || 'Sin categoría' }}
+        {{ client.category || 'Sin categoria' }}
       </span>
     </td>
 
@@ -195,7 +195,7 @@
 
             <td [style.background-color]="getPaymentRowStyle(client).backgroundColor + ' !important'">
       <span class="text-warning">
-        {{ client.exitTimestamp ? (client.exitTimestamp | date:'shortTime') : 'Aún en servicio' }}
+        {{ client.exitTimestamp ? (client.exitTimestamp | date:'shortTime') : 'Aun en servicio' }}
       </span>
     </td>
             <!--td>
@@ -206,8 +206,8 @@
 
 
 <td class="text-center" [style.background-color]="getPaymentRowStyle(client).backgroundColor + ' !important'" >
-              <div class="d-flex justify-content-center gap-2"> <!-- gap-2 = separación pequeña -->
-                <!-- Botón Editar -->
+              <div class="d-flex justify-content-center gap-2"> <!-- gap-2 = separacion pequena -->
+                <!-- Boton Editar -->
                 <button
                   class="btn btn-sm btn-outline-warning"
                   type="button"
@@ -215,7 +215,7 @@
                   <i class="fas fa-edit"></i>
                 </button>
 
-                <!-- Botón Eliminar -->
+                <!-- Boton Eliminar -->
                 <button
                   class="btn btn-sm btn-danger"
                   type="button"
@@ -230,7 +230,7 @@
       </table>
 
 
-      <nav aria-label="Paginación de clientes">
+      <nav aria-label="Paginacion de clientes">
   <ul class="pagination justify-content-center cursor-pointer">
     <li class="page-item" [class.disabled]="currentPageDaily === 1">
       <a class="page-link" (click)="setPageDaily(currentPageDaily - 1)">Previous</a>
@@ -299,14 +299,6 @@
             placeholder="Ej: C-ABC123">
         </div>
 
-        <!--div-- class="col-md-6">
-          <label class="form-label fw-medium">Clover</label>
-          <input
-            class="form-control"
-            type="number"
-            [(ngModel)]="editForm.clover"
-            placeholder="ID de transacción Clover">
-        </!--div-->
 
         <div class="col-md-6">
   <label class="form-label fw-medium">Clover</label>
@@ -318,25 +310,25 @@
     maxlength="4"
     pattern="[0-9]{4}"
     inputmode="numeric"
-    title="Código Clover de 4 dígitos">
+    title="Codigo Clover de 4 digitos">
   <div class="form-text small text-muted">
-    Código de 4 dígitos (ej: 5678)
+    Codigo de 4 digitos (ej: 5678)
   </div>
 
-  <!-- Validación movida al TS -->
+  <!-- Validacion movida al TS -->
   <div class="text-danger small mt-1" *ngIf="isCloverInvalid()">
-    Debe ser exactamente 4 números
+    Debe ser exactamente 4 numeros
   </div>
 </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-medium">Método de pago</label>
+          <label class="form-label fw-medium">Metodo de pago</label>
           <select class="form-select" [(ngModel)]="editForm.metodoPago">
             <option value="efectivo">Efectivo</option>
-            <option value="credito">Crédito</option>
+            <option value="credito">Credito</option>
             <option value="prepago">Prepago</option>
             <option value="qr">QR</option>
-             <option value="debito">Débito</option>
+             <option value="debito">Debito</option>
              <option value="scaneo">Escaneo</option>
             <option value="S/Cargo">Sin Cargo</option>
           </select>
@@ -362,7 +354,7 @@
     <!-- Espacios por Tiempo -->
     <div class="card mb-4">
       <div class="card-body">
-        <h5 class="card-title">Tiempo de Ocupación</h5>
+        <h5 class="card-title">Tiempo de Ocupacion</h5>
         <div class="row">
           <div class="col-md-4">
             <div class="time-stat">
@@ -379,7 +371,7 @@
           <div class="col-md-4">
             <div class="time-stat">
               <div class="time-number text-danger">{{timeStats.over3h}}</div>
-              <div class="time-label">Más de 3h</div>
+              <div class="time-label">Mas de 3h</div>
             </div>
           </div>
         </div>
@@ -390,11 +382,11 @@
 
 <div class="card shadow-lg border-0 mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #16213e 100%); border-radius: 16px;">
   <div class="card-body p-0 bg-black" style="border: solid 1px #334155;padding: 5px; border-radius: 5px;">
-    <!-- Título con icono -->
+    <!-- Titulo con icono -->
     <div class="d-flex align-items-center mb-4 p-3">
       <i class="bi bi-clock-history text-primary me-3" style="font-size: 1.8rem;"></i>
       <h5 class="card-title mb-0 text-gradient" style="background: linear-gradient(90deg, #0ea5e9, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-        Reporte Diario Automático
+        Reporte Diario Automatico
       </h5>
     </div>
 
@@ -414,7 +406,7 @@
           placeholder="HH:MM">
       </div>
 
-      <!-- Botones de acción -->
+      <!-- Botones de accion -->
       <div class="col-12 col-md-8 col-lg-9">
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-outline-warning btn-lg px-4 shadow-sm" (click)="generateAndSaveReport(true)">
@@ -424,7 +416,7 @@
 
           <button class="btn btn-outline-primary btn-lg px-4 shadow-sm" (click)="generateAndSaveMonthlyReport(true)">
   <i class="bi bi-calendar-month me-2"></i>
-  Generar Mensual + Guardar
+  {{ monthlyReportButtonLabel }}
 </button>
 
 
@@ -450,24 +442,31 @@
             <i class="bi bi-trophy me-2"></i>
             {{ showClientsRanking ? 'Ocultar Ranking' : 'Ranking de Clientes' }}
           </button>
+          <button class="btn btn-outline-warning btn-lg px-4 shadow-sm" (click)="toggleStatsPanel()">
+            <i class="bi bi-bar-chart-line me-2"></i>
+            {{ showStatsPanel ? 'Cerrar Estadisticas' : 'Estadisticas' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Estado del próximo reporte -->
+    <!-- Estado del proximo reporte -->
     <div class="mt-4 p-3 rounded-3" style="background: rgba(14, 165, 233, 0.1); border-left: 4px solid #0ea5e9;">
       <div class="d-flex align-items-center">
         <i class="bi bi-info-circle-fill text-info me-3" style="font-size: 1.4rem;"></i>
         <div>
-          <strong class="text-light">Próximo reporte automático:</strong>
+          <strong class="text-light">Proximo reporte automatico:</strong>
           <span class="ms-2 text-primary fw-bold">
             <span *ngIf="scheduledTime; else noProgramado">
-              Todos los días a las {{ scheduledTime }}
+              Todos los dias a las {{ scheduledTime }}
             </span>
             <ng-template #noProgramado>
               <span class="text-warning">No programado</span>
             </ng-template>
           </span>
+          <div *ngIf="lastScheduledSnapshotDay" class="small text-muted mt-1">
+            Ultimo snapshot automatico ejecutado: {{ lastScheduledSnapshotDay }}
+          </div>
         </div>
       </div>
     </div>
@@ -494,7 +493,17 @@
     </div>
 
     <div class="ranking-modal__body">
-      <div class="table-responsive ranking-table-wrapper">
+      <div *ngIf="isLoadingRanking" class="d-flex justify-content-center align-items-center py-5">
+        <div class="spinner-border text-warning me-2" role="status" style="width:1.8rem;height:1.8rem;">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+        <span class="text-muted">Calculando ranking...</span>
+      </div>
+      <div *ngIf="!isLoadingRanking && rankingList.length === 0" class="text-center py-5 text-muted">
+        <i class="bi bi-trophy fs-1 d-block mb-2 opacity-25"></i>
+        No hay servicios registrados este mes
+      </div>
+      <div class="table-responsive ranking-table-wrapper" *ngIf="!isLoadingRanking && rankingList.length > 0">
         <table class="table table-dark table-striped align-middle mb-0">
           <thead>
             <tr>
@@ -503,7 +512,7 @@
               <th>DNI</th>
               <th>Teléfono</th>
               <th>Servicios</th>
-              <th>Última visita</th>
+              <th>Ultima visita</th>
               <th>Ranking</th>
             </tr>
           </thead>
@@ -540,7 +549,7 @@
     </div>
 
     <div class="ranking-modal__footer">
-      <nav aria-label="Paginación ranking">
+      <nav aria-label="Paginacion ranking">
         <ul class="pagination justify-content-center mb-0">
           <li class="page-item" [class.disabled]="currentRankingPage === 1">
             <a class="page-link" (click)="setRankingPage(currentRankingPage - 1)">Previous</a>
@@ -558,4 +567,305 @@
 </div>
 
     <app-reports-list *ngIf="showReportsList" (closed)="closeReportsList()"></app-reports-list>
+
+<!-- MODAL ESTADISTICAS POR FECHA -->
+<div class="stats-modal" *ngIf="showStatsPanel">
+  <div class="stats-modal__backdrop" (click)="closeStatsPanel()"></div>
+  <div class="stats-modal__content">
+
+    <div class="stats-modal__header d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-line text-warning fs-4"></i>
+        <h5 class="mb-0 fw-bold">Estadisticas de Servicios</h5>
+      </div>
+      <button class="btn-close btn-close-white" type="button" (click)="closeStatsPanel()"></button>
+    </div>
+
+    <div class="stats-modal__body">
+
+      <!-- Selector modo -->
+      <div class="stats-modal__mode-switch d-flex gap-2 mb-4">
+        <button class="btn flex-fill fw-semibold"
+                [class.btn-warning]="statsMode === 'month'"
+                [class.btn-outline-secondary]="statsMode !== 'month'"
+                (click)="setStatsMode('month')">
+          <i class="bi bi-calendar-month me-1"></i> Por Mes
+        </button>
+        <button class="btn flex-fill fw-semibold"
+                [class.btn-warning]="statsMode === 'week'"
+                [class.btn-outline-secondary]="statsMode !== 'week'"
+                (click)="setStatsMode('week')">
+          <i class="bi bi-calendar-week me-1"></i> Por Semana
+        </button>
+        <button class="btn flex-fill fw-semibold"
+                [class.btn-warning]="statsMode === 'day'"
+                [class.btn-outline-secondary]="statsMode !== 'day'"
+                (click)="setStatsMode('day')">
+          <i class="bi bi-calendar-day me-1"></i> Por Dia
+        </button>
+      </div>
+
+      <!-- Selector mensual -->
+      <div *ngIf="statsMode === 'month'" class="stats-modal__filters mb-3">
+        <div class="stats-modal__filter-header">
+          <label class="stats-modal__filter-label mb-0">Periodo mensual</label>
+          <span class="stats-modal__filter-hint">Selecciona el mes completo a consultar</span>
+        </div>
+        <div class="stats-modal__selector-grid">
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Anio</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar3"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedYear"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let year of statsYearOptions" [ngValue]="year">{{ year }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Mes</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar-month"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedMonth"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let month of statsMonthOptions" [ngValue]="month.value">{{ month.label }}</option>
+              </select>
+              <button class="btn btn-warning px-3" (click)="loadStats()" title="Buscar">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector semanal -->
+      <div *ngIf="statsMode === 'week'" class="stats-modal__filters mb-3 d-grid gap-2">
+        <div class="stats-modal__filter-header">
+          <label class="stats-modal__filter-label mb-0">Periodo semanal</label>
+          <span class="stats-modal__filter-hint">Elige el mes base y luego la semana</span>
+        </div>
+        <div class="stats-modal__selector-grid">
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Anio</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar3"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedYear"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let year of statsYearOptions" [ngValue]="year">{{ year }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Mes</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar-month"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedMonth"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let month of statsMonthOptions" [ngValue]="month.value">{{ month.label }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-group-text bg-dark border-secondary text-warning">
+            <i class="bi bi-calendar-range"></i>
+          </span>
+          <select class="form-select bg-dark text-white border-secondary"
+                  [(ngModel)]="statsSelectedWeekIndex"
+                  (change)="onStatsWeekChange()">
+            <option *ngFor="let option of statsWeekOptions; let i = index" [ngValue]="i">
+              {{ option.label }}
+            </option>
+          </select>
+          <button class="btn btn-warning px-3" (click)="loadStats()" title="Buscar">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Selector diario -->
+      <div *ngIf="statsMode === 'day'" class="stats-modal__filters mb-3 d-grid gap-2">
+        <div class="stats-modal__filter-header">
+          <label class="stats-modal__filter-label mb-0">Periodo diario</label>
+          <span class="stats-modal__filter-hint">Selecciona el mes base y un dia dentro de ese rango</span>
+        </div>
+        <div class="stats-modal__selector-grid">
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Anio</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar3"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedYear"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let year of statsYearOptions" [ngValue]="year">{{ year }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="stats-modal__selector-card">
+            <span class="stats-modal__selector-title">Mes</span>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-warning">
+                <i class="bi bi-calendar-month"></i>
+              </span>
+              <select class="form-select bg-dark text-white border-secondary"
+                      [(ngModel)]="statsSelectedMonth"
+                      (ngModelChange)="onStatsMonthSelectionChange()">
+                <option *ngFor="let month of statsMonthOptions" [ngValue]="month.value">{{ month.label }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="input-group">
+          <span class="input-group-text bg-dark border-secondary text-warning">
+            <i class="bi bi-calendar-event"></i>
+          </span>
+          <input type="date" class="form-control bg-dark text-white border-secondary"
+                 [(ngModel)]="statsDateInput"
+                 [min]="statsDayMinDate"
+                 [max]="statsDayMaxDate"
+                 (change)="onStatsDateChange()">
+          <button class="btn btn-warning px-3" (click)="loadStats()" title="Buscar">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Etiqueta periodo -->
+      <div *ngIf="statsPeriodLabel" class="text-center mb-3">
+        <span class="badge bg-warning text-dark fs-6 px-3 py-2 rounded-pill">
+          <i class="bi bi-calendar-range me-1"></i> {{ statsPeriodLabel }}
+        </span>
+      </div>
+
+      <!-- Spinner -->
+      <div *ngIf="isLoadingStats" class="d-flex justify-content-center align-items-center py-5">
+        <div class="spinner-border text-warning me-2" role="status" style="width:1.8rem;height:1.8rem;">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+        <span class="text-muted">Cargando servicios...</span>
+      </div>
+
+      <ng-container *ngIf="!isLoadingStats">
+
+        <!-- Tarjetas resumen -->
+        <div class="row g-3 mb-4" *ngIf="statsClients.length > 0 || statsDateInput">
+          <div class="col-6">
+            <div class="card h-100 text-center stats-modal__summary-card stats-modal__summary-card--services">
+              <div class="card-body stats-modal__summary-body">
+                <div class="stats-modal__summary-number text-warning">{{ statsClients.length }}</div>
+                <div class="text-muted small stats-modal__summary-label">
+                  <i class="bi bi-car-front me-1"></i>Total servicios
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card h-100 text-center stats-modal__summary-card stats-modal__summary-card--amount">
+              <div class="card-body stats-modal__summary-body">
+                <div class="stats-modal__summary-number text-success">${{ statsTotalCobrado }}</div>
+                <div class="text-muted small stats-modal__summary-label">
+                  <i class="bi bi-cash-stack me-1"></i>Total cobrado
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose por metodo de pago -->
+        <div *ngIf="statsPaymentBreakdown.length > 0" class="mb-4">
+          <h6 class="text-muted mb-3">
+            <i class="bi bi-pie-chart-fill me-1 text-warning"></i>Por metodo de pago
+          </h6>
+          <div *ngFor="let item of statsPaymentBreakdown" class="mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="badge text-capitalize" style="background:rgba(255,255,255,0.1); font-size:0.8rem; min-width:80px;">
+                {{ item.method }}
+              </span>
+              <div class="d-flex gap-2 align-items-center">
+                <span class="text-warning small fw-bold">{{ item.count }} serv.</span>
+                <span class="text-success small">${{ item.amount }}</span>
+              </div>
+            </div>
+            <div class="progress" style="height:6px; background:rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-warning"
+                   [style.width.%]="statsClients.length ? (item.count / statsClients.length) * 100 : 0">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla detalle -->
+        <div *ngIf="statsClients.length > 0">
+          <h6 class="text-muted mb-2">
+            <i class="bi bi-people-fill me-1 text-warning"></i>Detalle de servicios
+          </h6>
+          <div class="table-responsive" style="max-height:320px; overflow-y:auto;">
+            <table class="table table-dark table-sm align-middle mb-0" style="font-size:0.82rem;">
+              <thead class="sticky-top" style="background:#1a1a2e;">
+                <tr>
+                  <th>Cliente</th>
+                  <th>DNI</th>
+                  <th>Vehiculo</th>
+                  <th>Hora</th>
+                  <th>Pago</th>
+                  <th class="text-end">$</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of paginatedStatsClients">
+                  <td class="fw-semibold">{{ c.name || '-' }}</td>
+                  <td class="text-muted">{{ c.dni || '-' }}</td>
+                  <td>
+                    <span class="badge bg-secondary">{{ c.vehicle || '-' }}</span>
+                  </td>
+                  <td class="text-muted">{{ formatEntryDate(c.entryTimestamp) }}</td>
+                  <td>
+                    <span class="badge" style="background:rgba(255,255,255,0.1);">{{ c.paymentMethod || '-' }}</span>
+                  </td>
+                  <td class="text-end text-success fw-bold">${{ c.price || 0 }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <nav *ngIf="statsTotalPages > 1" class="mt-3" aria-label="Paginacion de estadisticas">
+            <ul class="pagination justify-content-center mb-0">
+              <li class="page-item" [class.disabled]="statsCurrentPage === 1">
+                <a class="page-link" (click)="setStatsPage(statsCurrentPage - 1)">Anterior</a>
+              </li>
+              <li class="page-item" *ngFor="let page of statsPageNumbers" [class.active]="page === statsCurrentPage">
+                <a class="page-link" (click)="setStatsPage(page)">{{ page }}</a>
+              </li>
+              <li class="page-item" [class.disabled]="statsCurrentPage === statsTotalPages">
+                <a class="page-link" (click)="setStatsPage(statsCurrentPage + 1)">Siguiente</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="statsClients.length === 0 && statsDateInput" class="text-center py-5 text-muted">
+          <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-25"></i>
+          No hay servicios para este periodo
+        </div>
+
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+
 

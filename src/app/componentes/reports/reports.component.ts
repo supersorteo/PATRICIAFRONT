@@ -1,13 +1,12 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
+﻿import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil, combineLatest, catchError, of, map, switchMap, forkJoin } from 'rxjs';
 import { Client, Report, Space, Subsuelo } from '../../models/autolavado.model';
 import { AutolavadoService } from '../../services/autolavado.service';
-import { HttpClient } from '@angular/common/http';
 import { ReportsListComponent } from "../reports-list/reports-list.component";
 import { FormatPhonePipe } from "../../services/format-phone.pipe";
-import { environment } from '../../../environments/environment';
+import { ReportScheduleConfig, ReportsApiService } from '../../services/reports-api.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
 
@@ -23,15 +22,29 @@ interface RankingClienteView {
   tier: 'oro' | 'plata' | 'bronce' | 'ninguno';
 }
 
+interface StatsWeekOption {
+  label: string;
+  from: string;
+  to: string;
+}
+
+interface StatsMonthOption {
+  value: number;
+  label: string;
+  shortLabel: string;
+}
+
 @Component({
   selector: 'app-reports',
   standalone: true,
   imports: [CommonModule, FormsModule, ReportsListComponent, FormatPhonePipe],
   templateUrl: './reports.component.html',
-  styleUrls: ['./reports.component.scss']
+  styleUrls: ['./reports.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ReportsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  private readonly reportServerTimeZone = 'America/Argentina/Buenos_Aires';
 
   subsuelos: Subsuelo[] = [];
   spaces: { [key: string]: Space } = {};
@@ -84,18 +97,44 @@ pageSizeDaily = 5;
   editClientHeaderMessage = '';
   private editClientHeaderTimer: any = null;
 
-  private API_BASE = environment.apiUrl;
-
   showReportsList = false;
   showClientsRanking = false;
   currentRankingPage = 1;
   rankingPageSize = 12;
+  isLoadingRanking = false;
 
+  showStatsPanel = false;
+  statsDateInput = '';
+  statsMonthInput = '';
+  statsMode: 'month' | 'day' | 'week' = 'month';
+  statsWeekOptions: StatsWeekOption[] = [];
+  statsSelectedWeekIndex = 0;
+  statsSelectedYear = new Date().getFullYear();
+  statsSelectedMonth = new Date().getMonth() + 1;
+  statsClients: Client[] = [];
+  statsCurrentPage = 1;
+  readonly statsPageSize = 10;
+  isLoadingStats = false;
+  readonly statsMonthOptions: StatsMonthOption[] = [
+    { value: 1, label: 'Enero', shortLabel: 'Ene' },
+    { value: 2, label: 'Febrero', shortLabel: 'Feb' },
+    { value: 3, label: 'Marzo', shortLabel: 'Mar' },
+    { value: 4, label: 'Abril', shortLabel: 'Abr' },
+    { value: 5, label: 'Mayo', shortLabel: 'May' },
+    { value: 6, label: 'Junio', shortLabel: 'Jun' },
+    { value: 7, label: 'Julio', shortLabel: 'Jul' },
+    { value: 8, label: 'Agosto', shortLabel: 'Ago' },
+    { value: 9, label: 'Septiembre', shortLabel: 'Sep' },
+    { value: 10, label: 'Octubre', shortLabel: 'Oct' },
+    { value: 11, label: 'Noviembre', shortLabel: 'Nov' },
+    { value: 12, label: 'Diciembre', shortLabel: 'Dic' }
+  ];
 
 rankingList: RankingClienteView[] = [];
 
-scheduledTime: string = ''; // Hora guardada (ej. "23:30")
-private dailyInterval: any;
+scheduledTime: string = ''; // Hora programada en servidor (HH:mm)
+scheduledTimeServer = '';
+lastScheduledSnapshotDay = '';
 currentPageToday = 1;
 pageSizeToday = 5;
 dailyClients: Client[] = [];
@@ -118,11 +157,12 @@ filteredDailyClientsList: Client[] = [];  // Lista filtrada real (no getter)
 paginatedDailyClientsList: Client[] = []; // Lista paginada real
 
 private statsRefreshIntervalId: any = null;
+private scheduleStatusPollId: any = null;
 
   constructor(
     private autolavadoService: AutolavadoService,
     private cdr: ChangeDetectorRef,
-    private http: HttpClient,
+    private reportsApi: ReportsApiService,
     private toastService: ToastService,
     private confirmService: ConfirmService,
     private ngZone: NgZone
@@ -156,13 +196,17 @@ private statsRefreshIntervalId: any = null;
     this.applyDailyClientFiltersAndPagination();
 
       this.calculateStats();
-      this.cdr.detectChanges();
+      this.cdr.markForCheck();
     });
 
     this.ngZone.runOutsideAngular(() => {
       this.statsRefreshIntervalId = setInterval(() => {
+        if (!this.shouldRefreshLiveStats()) {
+          return;
+        }
+
         this.calculateStats();
-        this.ngZone.run(() => this.cdr.detectChanges());
+        this.ngZone.run(() => this.cdr.markForCheck());
       }, 60000);
     });
 
@@ -173,11 +217,13 @@ private statsRefreshIntervalId: any = null;
 
 
 
-    const saved = localStorage.getItem('dailyReportTime');
-  if (saved) {
-    this.scheduledTime = saved;
-    this.startDailyScheduler();
-  }
+  this.loadReportScheduleConfig();
+
+  this.ngZone.runOutsideAngular(() => {
+    this.scheduleStatusPollId = setInterval(() => {
+      this.ngZone.run(() => this.loadReportScheduleConfig('poll'));
+    }, 30000);
+  });
 
 
 
@@ -198,10 +244,9 @@ this.loadPaymentColors();
     clearInterval(this.statsRefreshIntervalId);
     this.statsRefreshIntervalId = null;
   }
-
-  if (this.dailyInterval) {
-    clearInterval(this.dailyInterval);
-    this.dailyInterval = null;
+  if (this.scheduleStatusPollId) {
+    clearInterval(this.scheduleStatusPollId);
+    this.scheduleStatusPollId = null;
   }
 
   this.destroy$.next();
@@ -326,13 +371,428 @@ closeReportsList(): void {
 toggleClientsRanking(): void {
   this.showClientsRanking = !this.showClientsRanking;
   if (this.showClientsRanking) {
-    this.rankingList = this.buildMonthlyRanking();
     this.currentRankingPage = 1;
+    this.loadRankingFromBackend();
   }
 }
 
 closeClientsRanking(): void {
   this.showClientsRanking = false;
+}
+
+private loadRankingFromBackend(): void {
+  this.isLoadingRanking = true;
+  this.cdr.markForCheck();
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  this.autolavadoService.getUniqueClientsFromBackend().pipe(
+    takeUntil(this.destroy$),
+    switchMap(clients => {
+      const dnis = clients.map((c: Client) => c.dni).filter(Boolean) as string[];
+      return this.autolavadoService.getMonthlyServiceCountsByDnis(dnis, monthKey).pipe(
+        map((counts: Record<string, number>) => ({ clients, counts }))
+      );
+    })
+  ).subscribe({
+    next: ({ clients, counts }) => {
+      this.rankingList = this.buildRankingFromBackendData(clients as Client[], counts as Record<string, number>);
+      this.isLoadingRanking = false;
+      this.cdr.markForCheck();
+    },
+    error: () => {
+      this.isLoadingRanking = false;
+      this.cdr.markForCheck();
+    }
+  });
+}
+
+private buildRankingFromBackendData(clients: Client[], counts: Record<string, number>): RankingClienteView[] {
+  const ranking = clients
+    .map(c => {
+      const count = c.dni ? (counts[c.dni] || 0) : 0;
+      const ts = c.exitTimestamp || (c.entryTimestamp ? new Date(c.entryTimestamp).getTime() : 0);
+      return {
+        position: 0,
+        name: c.name || '-',
+        dni: c.dni || '-',
+        phone: c.phoneIntl || c.phoneRaw || '-',
+        totalServices: count,
+        lastVisit: ts ? new Date(ts).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+        tier: 'ninguno' as RankingClienteView['tier']
+      };
+    })
+    .filter(r => r.totalServices > 0)
+    .sort((a, b) => b.totalServices - a.totalServices)
+    .slice(0, 100);
+
+  ranking.forEach((r, i) => {
+    r.position = i + 1;
+    if (i === 0) r.tier = 'oro';
+    else if (i === 1) r.tier = 'plata';
+    else if (i === 2) r.tier = 'bronce';
+  });
+
+  return ranking;
+}
+
+toggleStatsPanel(): void {
+  this.showStatsPanel = !this.showStatsPanel;
+  if (this.showStatsPanel) {
+    if (!this.statsDateInput) {
+      this.statsDateInput = this.formatDateInputValue(new Date());
+    }
+    if (!this.statsMonthInput) {
+      this.statsMonthInput = this.formatMonthInputValue(new Date());
+    }
+    this.syncStatsSelectorsFromMonthInput();
+    this.refreshStatsWeekOptions();
+    this.loadStats();
+  }
+}
+
+closeStatsPanel(): void {
+  this.showStatsPanel = false;
+}
+
+setStatsMode(mode: 'month' | 'week' | 'day'): void {
+  this.statsMode = mode;
+
+  if (!this.statsDateInput) {
+    this.statsDateInput = this.formatDateInputValue(new Date());
+  }
+  if (!this.statsMonthInput) {
+    this.statsMonthInput = this.formatMonthInputValue(new Date());
+  }
+  this.syncStatsSelectorsFromMonthInput();
+  if (mode === 'day') {
+    this.ensureStatsDateInsideSelectedMonth();
+  }
+  if (mode === 'week') {
+    this.refreshStatsWeekOptions();
+  }
+
+  this.loadStats();
+}
+
+onStatsMonthChange(): void {
+  if (!this.statsMonthInput) return;
+  this.syncStatsSelectorsFromMonthInput();
+  this.ensureStatsDateInsideSelectedMonth();
+  this.refreshStatsWeekOptions();
+  this.loadStats();
+}
+
+onStatsMonthSelectionChange(): void {
+  this.statsMonthInput = `${this.statsSelectedYear}-${String(this.statsSelectedMonth).padStart(2, '0')}`;
+  this.onStatsMonthChange();
+}
+
+onStatsWeekChange(): void {
+  this.loadStats();
+}
+
+onStatsDateChange(): void {
+  this.syncStatsMonthWithDate();
+  this.loadStats();
+}
+
+loadStats(): void {
+  if (this.statsMode === 'day') {
+    if (!this.statsDateInput) return;
+    const baseDate = new Date(this.statsDateInput + 'T12:00:00');
+    if (isNaN(baseDate.getTime())) return;
+    const day = this.formatDateInputValue(baseDate);
+    this.fetchStatsByRange(day, day);
+    return;
+  }
+
+  if (this.statsMode === 'week') {
+    if (!this.statsMonthInput) return;
+    this.refreshStatsWeekOptions();
+    const selectedWeek = this.statsWeekOptions[this.statsSelectedWeekIndex];
+    if (!selectedWeek) return;
+    this.fetchStatsByRange(selectedWeek.from, selectedWeek.to);
+    return;
+  }
+
+  if (!this.statsMonthInput) return;
+  const baseDate = this.parseMonthInput(this.statsMonthInput);
+  if (!baseDate) return;
+  const { from, to } = this.getMonthRange(baseDate);
+  this.fetchStatsByRange(from, to);
+}
+
+private fetchStatsByRange(from: string, to: string): void {
+  this.isLoadingStats = true;
+  this.cdr.markForCheck();
+  this.autolavadoService.getClientsByDateRange(from, to).pipe(
+    takeUntil(this.destroy$)
+  ).subscribe({
+    next: clients => {
+      this.statsClients = clients;
+      this.statsCurrentPage = 1;
+      this.isLoadingStats = false;
+      this.cdr.markForCheck();
+    },
+    error: () => {
+      this.statsClients = [];
+      this.statsCurrentPage = 1;
+      this.isLoadingStats = false;
+      this.cdr.markForCheck();
+    }
+  });
+}
+
+
+get statsTotalCobrado(): number {
+  return this.statsClients.reduce((sum, c) => sum + (c.price || 0), 0);
+}
+
+get statsPaymentBreakdown(): { method: string; count: number; amount: number }[] {
+  const map = new Map<string, { count: number; amount: number }>();
+  for (const c of this.statsClients) {
+    const method = c.paymentMethod || 'otros';
+    const cur = map.get(method) || { count: 0, amount: 0 };
+    cur.count++;
+    cur.amount += c.price || 0;
+    map.set(method, cur);
+  }
+  return Array.from(map.entries())
+    .map(([method, v]) => ({ method, ...v }))
+    .sort((a, b) => b.count - a.count);
+}
+
+formatEntryDate(ts: any): string {
+  if (!ts) return '-';
+  try {
+    return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '-';
+  }
+}
+
+get paginatedStatsClients(): Client[] {
+  const start = (this.statsCurrentPage - 1) * this.statsPageSize;
+  return this.statsClients.slice(start, start + this.statsPageSize);
+}
+
+get statsTotalPages(): number {
+  return Math.max(1, Math.ceil(this.statsClients.length / this.statsPageSize));
+}
+
+get statsPageNumbers(): number[] {
+  const total = this.statsTotalPages;
+  const current = this.statsCurrentPage;
+  const maxPages = 5;
+  let start = Math.max(1, current - Math.floor(maxPages / 2));
+  let end = Math.min(total, start + maxPages - 1);
+
+  if (end - start + 1 < maxPages) {
+    start = Math.max(1, end - maxPages + 1);
+  }
+
+  const pages: number[] = [];
+  for (let page = start; page <= end; page++) {
+    pages.push(page);
+  }
+  return pages;
+}
+
+setStatsPage(page: number): void {
+  if (page < 1 || page > this.statsTotalPages) {
+    return;
+  }
+  this.statsCurrentPage = page;
+  this.cdr.markForCheck();
+}
+
+get statsPeriodLabel(): string {
+  if (this.statsMode === 'day') {
+    if (!this.statsDateInput) return '';
+    const baseDate = new Date(this.statsDateInput + 'T12:00:00');
+    if (isNaN(baseDate.getTime())) return '';
+    return baseDate.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  }
+
+  if (this.statsMode === 'week') {
+    return this.statsWeekOptions[this.statsSelectedWeekIndex]?.label || '';
+  }
+
+  const baseDate = this.parseMonthInput(this.statsMonthInput);
+  if (!baseDate) return '';
+  return baseDate.toLocaleDateString('es-AR', {
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+get statsDayMinDate(): string {
+  const monthBase = this.parseMonthInput(this.statsMonthInput);
+  if (!monthBase) return '';
+  return this.getMonthRange(monthBase).from;
+}
+
+get statsDayMaxDate(): string {
+  const monthBase = this.parseMonthInput(this.statsMonthInput);
+  if (!monthBase) return '';
+  return this.getMonthRange(monthBase).to;
+}
+
+private getWeekRange(baseDate: Date, includeDates = false): { from: string; to: string; fromDate?: Date; toDate?: Date } {
+  const dayOfWeek = baseDate.getDay();
+  const monday = new Date(baseDate);
+  monday.setDate(baseDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const range: { from: string; to: string; fromDate?: Date; toDate?: Date } = {
+    from: this.formatDateInputValue(monday),
+    to: this.formatDateInputValue(sunday)
+  };
+
+  if (includeDates) {
+    range.fromDate = monday;
+    range.toDate = sunday;
+  }
+
+  return range;
+}
+
+private refreshStatsWeekOptions(): void {
+  const baseDate = this.parseMonthInput(this.statsMonthInput);
+  if (!baseDate) {
+    this.statsWeekOptions = [];
+    this.statsSelectedWeekIndex = 0;
+    return;
+  }
+
+  const nextOptions = this.buildWeekOptionsForMonth(baseDate);
+  const previous = this.statsWeekOptions[this.statsSelectedWeekIndex];
+  this.statsWeekOptions = nextOptions;
+
+  if (!nextOptions.length) {
+    this.statsSelectedWeekIndex = 0;
+    return;
+  }
+
+  if (previous) {
+    const matchedIndex = nextOptions.findIndex(option => option.from === previous.from && option.to === previous.to);
+    if (matchedIndex >= 0) {
+      this.statsSelectedWeekIndex = matchedIndex;
+      return;
+    }
+  }
+
+  const currentMonthKey = this.formatMonthInputValue(new Date());
+  if (this.statsMonthInput === currentMonthKey) {
+    const today = this.formatDateInputValue(new Date());
+    const currentWeekIndex = nextOptions.findIndex(option => option.from <= today && option.to >= today);
+    this.statsSelectedWeekIndex = currentWeekIndex >= 0 ? currentWeekIndex : 0;
+    return;
+  }
+
+  this.statsSelectedWeekIndex = 0;
+}
+
+private ensureStatsDateInsideSelectedMonth(): void {
+  const monthBase = this.parseMonthInput(this.statsMonthInput);
+  if (!monthBase) return;
+
+  const { from, to } = this.getMonthRange(monthBase);
+  if (!this.statsDateInput || this.statsDateInput < from || this.statsDateInput > to) {
+    const today = this.formatDateInputValue(new Date());
+    this.statsDateInput = today >= from && today <= to ? today : from;
+  }
+}
+
+private syncStatsMonthWithDate(): void {
+  if (!this.statsDateInput) return;
+  const selectedDate = new Date(this.statsDateInput + 'T12:00:00');
+  if (isNaN(selectedDate.getTime())) return;
+  this.statsMonthInput = this.formatMonthInputValue(selectedDate);
+  this.syncStatsSelectorsFromMonthInput();
+  this.refreshStatsWeekOptions();
+}
+
+private syncStatsSelectorsFromMonthInput(): void {
+  const parsed = this.parseMonthInput(this.statsMonthInput);
+  if (!parsed) return;
+  this.statsSelectedYear = parsed.getFullYear();
+  this.statsSelectedMonth = parsed.getMonth() + 1;
+}
+
+private buildWeekOptionsForMonth(baseDate: Date): StatsWeekOption[] {
+  const monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  const monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+  const options: StatsWeekOption[] = [];
+  const labelFormatter = (value: Date) => value.toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: 'short'
+  });
+
+  let cursor = new Date(monthStart);
+  while (cursor <= monthEnd) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    if (weekEnd > monthEnd) {
+      weekEnd.setTime(monthEnd.getTime());
+    }
+
+    options.push({
+      label: `${labelFormatter(weekStart)} - ${labelFormatter(weekEnd)} ${weekEnd.getFullYear()}`,
+      from: this.formatDateInputValue(weekStart),
+      to: this.formatDateInputValue(weekEnd)
+    });
+
+    cursor = new Date(weekEnd);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return options;
+}
+
+private getMonthRange(baseDate: Date): { from: string; to: string } {
+  const monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  const monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+
+  return {
+    from: this.formatDateInputValue(monthStart),
+    to: this.formatDateInputValue(monthEnd)
+  };
+}
+
+private formatDateInputValue(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+private formatMonthInputValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+private parseMonthInput(monthValue: string): Date | null {
+  if (!monthValue) return null;
+  const parsed = new Date(`${monthValue}-01T12:00:00`);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+get statsYearOptions(): number[] {
+  const currentYear = new Date().getFullYear();
+  const minYear = Math.min(currentYear - 3, this.statsSelectedYear);
+  const maxYear = Math.max(currentYear + 1, this.statsSelectedYear + 1);
+  const years: number[] = [];
+
+  for (let year = maxYear; year >= minYear; year--) {
+    years.push(year);
+  }
+
+  return years;
 }
 
 
@@ -482,7 +942,6 @@ private showEditClientHeaderMessage(message: string): void {
   this.editClientHeaderTimer = setTimeout(() => {
     this.editClientHeaderMessage = '';
     this.editClientHeaderTimer = null;
-    this.cdr.detectChanges();
     this.closeEditClient();
   }, 3000);
 }
@@ -499,7 +958,7 @@ getPaymentColor(clientId: string | number | undefined): string | null {
 
 getPaymentRowStyle(client: Client): { backgroundColor: string } {
   if (!client?.id) {
-    //console.log('getPaymentRowStyle: sin client o id → default');
+    //console.log('getPaymentRowStyle: sin client o id â†’ default');
     return { backgroundColor: '#34495e' };
   }
 
@@ -507,25 +966,25 @@ getPaymentRowStyle(client: Client): { backgroundColor: string } {
   const savedColor = this.paymentColorsByClientId[idStr];
   const method = (client.paymentMethod || '').trim().toLowerCase();
 
-  //console.log(`getPaymentRowStyle para ID ${idStr}: método = "${method}", color guardado = ${savedColor || 'ninguno'}`);
+  //console.log(`getPaymentRowStyle para ID ${idStr}: mÃ©todo = "${method}", color guardado = ${savedColor || 'ninguno'}`);
 
   // Prioridad 1: color persistente
   if (savedColor) {
-   // console.log(`→ Usando color persistente: ${savedColor}`);
+   // console.log(`â†’ Usando color persistente: ${savedColor}`);
     return { backgroundColor: savedColor };
   }
 
-  // Prioridad 2: color según método actual
+  // Prioridad 2: color segÃºn mÃ©todo actual
   const colors = this.paymentMethodColors;
   const color = colors[method] || '#34495e';
-  //console.log(`→ Usando color por método "${method}": ${color}`);
+  //console.log(`â†’ Usando color por mÃ©todo "${method}": ${color}`);
 
   return { backgroundColor: color };
 }
 
 
 acceptEditClient(): void {
-  console.log('Botón Guardar cambios pulsado');
+  console.log('BotÃ³n Guardar cambios pulsado');
 
   if (!this.editingClient) return;
 
@@ -535,7 +994,7 @@ acceptEditClient(): void {
     return;
   }
 
-  // Validación Clover
+  // ValidaciÃ³n Clover
   if (this.editForm.clover && !/^\d{4}$/.test(this.editForm.clover)) {
     this.toastService.showWarning('El codigo Clover debe tener exactamente 4 digitos numericos.');
     return;
@@ -551,7 +1010,7 @@ acceptEditClient(): void {
 
   console.log('Payload enviado al backend:', updatedData);
 
-  this.autolavadoService.updateClientInBackend(clientId, updatedData).subscribe({
+  this.autolavadoService.updateClientInBackend(clientId, updatedData).pipe(takeUntil(this.destroy$)).subscribe({
     next: (updatedClient) => {
       console.log('Cliente actualizado:', updatedClient);
 
@@ -572,12 +1031,11 @@ acceptEditClient(): void {
         console.log(`Color persistente GUARDADO para ${clientId}: ${this.paymentMethodColors[method]}`);
       } else {
         delete this.paymentColorsByClientId[clientId.toString()];
-        console.log(`Color eliminado para ${clientId} (método vacío)`);
+        console.log(`Color eliminado para ${clientId} (mÃ©todo vacÃ­o)`);
       }
       this.savePaymentColors();
 
       this.calculateStats();
-      this.cdr.detectChanges();
       this.cdr.markForCheck();
 
       this.showEditClientHeaderMessage('Datos actualizados correctamente');
@@ -640,7 +1098,7 @@ private calculateStats(): void {
   });
 
   // -----------------------------
-  // 1) Estadísticas generales + por subsuelo (una sola pasada en spaces)
+  // 1) EstadÃ­sticas generales + por subsuelo (una sola pasada en spaces)
   // -----------------------------
   let occupiedCount = 0;
 
@@ -689,7 +1147,7 @@ private calculateStats(): void {
   });
 
   // -----------------------------
-  // 2) Estadísticas del día (una sola pasada en dailyClients)
+  // 2) EstadÃ­sticas del dÃ­a (una sola pasada en dailyClients)
   // -----------------------------
   let totalCobrado = 0;
 
@@ -865,7 +1323,6 @@ getElapsedTimeForClient(client: Client): string {
 
   refreshStats(): void {
     this.calculateStats();
-    this.cdr.detectChanges();
   }
 
   exportData(): void {
@@ -897,122 +1354,199 @@ getElapsedTimeForClient(client: Client): string {
 
 
 saveScheduledTime(): void {
-  if (!this.scheduledTime) {
-    console.warn('Hora programada vacía. No se guarda nada.');
-    return;
-  }
+  const normalizedTime = (this.scheduledTime || '').trim();
+  const normalizedServerTime = this.localTimeToServerTime(normalizedTime);
+  const payload: ReportScheduleConfig = {
+    enabled: !!normalizedServerTime,
+    dailySnapshotTime: normalizedServerTime || null,
+    lastSnapshotDay: null
+  };
 
-  console.log('Guardando nueva hora programada:', this.scheduledTime);
+  console.log('%c[REPORT-SCHEDULE][FRONT] Guardando programacion', 'color:#38bdf8;font-weight:bold;', {
+    localTimeSelected: normalizedTime || null,
+    serverTimeSent: normalizedServerTime || null,
+    serverZone: this.reportServerTimeZone,
+    browserTime: new Date().toISOString()
+  });
 
-  // Guardar la nueva hora
-  localStorage.setItem('dailyReportTime', this.scheduledTime);
-
-  // ← CLAVE: Limpiar el último reporte generado para que se pueda generar de nuevo hoy
-  localStorage.removeItem('lastDailyReportDate');
-  console.log('lastDailyReportDate limpiado para permitir nuevo reporte hoy');
-
-  // Reiniciar el scheduler con la nueva hora
-  this.startDailyScheduler();
-
-  this.showSuccessToast(`Reporte programado a las ${this.scheduledTime}. Se podrá generar hoy con la nueva hora.`);
-}
-
-
-
-
-
-private startDailyScheduler(): void {
-  console.log('%cIniciando scheduler de reporte automático', 'color: #0ea5e9; font-weight: bold;');
-  console.log('Hora programada guardada:', this.scheduledTime);
-
-  if (!this.scheduledTime) {
-    console.warn('No hay hora programada. Scheduler detenido.');
-    return;
-  }
-
-  // Limpiar intervalo anterior
-  if (this.dailyInterval) {
-    clearInterval(this.dailyInterval);
-    console.log('Intervalo anterior limpiado');
-  }
-
-  // Verificar inmediatamente
-  console.log('Verificando ahora al iniciar...');
-  this.checkAndGenerateDailyReport();
-
-  // Verificar cada minuto
-  this.dailyInterval = setInterval(() => {
-    console.log('%c⏰ Verificando hora programada...', 'color: #3b82f6');
-    this.checkAndGenerateDailyReport();
-  }, 60 * 1000);
-
-  console.log('Scheduler iniciado: verifica cada minuto');
-}
-
-
-
-checkIfShouldGenerateDailyReport(): void {
-  if (!this.scheduledTime) return;
-
-  const [hour, minute] = this.scheduledTime.split(':').map(Number);
-  const now = new Date();
-  const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
-
-  // Si ya pasó la hora hoy
-  if (now > scheduled) {
-    const lastRun = localStorage.getItem('lastDailyReportDate');
-    const today = now.toDateString();
-
-    if (lastRun !== today) {
-      this.generateAndSaveReport(false);
-      localStorage.setItem('lastDailyReportDate', today);
-      console.log('Reporte diario automático generado a las', this.scheduledTime);
+  this.reportsApi.updateScheduleConfig(payload).pipe(takeUntil(this.destroy$)).subscribe({
+    next: (config) => {
+      this.applyScheduleConfig(config, 'save');
+      if (config.enabled && config.dailySnapshotTime) {
+        this.showSuccessToast(`Reporte automatico programado para las ${this.scheduledTime} de tu hora local.`);
+      } else {
+        this.showWarningToast('Programacion automatica desactivada.');
+      }
+    },
+    error: (error) => {
+      console.error('Error guardando configuracion de reporte automatico', error);
+      this.showErrorToast('No se pudo guardar la programacion automatica en el servidor.');
     }
-  }
+  });
 }
 
+private loadReportScheduleConfig(source: 'init' | 'poll' | 'save' = 'init'): void {
+  this.reportsApi.getScheduleConfig().pipe(takeUntil(this.destroy$)).subscribe({
+    next: (config) => {
+      this.applyScheduleConfig(config, source);
+    },
+    error: (error) => {
+      console.error('Error cargando configuracion de reporte automatico', error);
+    }
+  });
+}
 
+private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, source: 'init' | 'poll' | 'save'): void {
+  const previousTime = this.scheduledTime || '';
+  const previousLastDay = this.lastScheduledSnapshotDay || '';
 
+  this.scheduledTimeServer = config?.dailySnapshotTime || '';
+  this.scheduledTime = this.serverTimeToLocalTime(this.scheduledTimeServer) || '';
+  this.lastScheduledSnapshotDay = config?.lastSnapshotDay || '';
 
-private checkAndGenerateDailyReport(): void {
-  if (!this.scheduledTime) {
-    console.warn('No hay hora programada configurada');
-    return;
+  console.log('[REPORT-SCHEDULE][FRONT]', {
+    source,
+    enabled: !!config?.enabled,
+    scheduledTimeLocal: this.scheduledTime || null,
+    scheduledTimeServer: this.scheduledTimeServer || null,
+    serverZone: this.reportServerTimeZone,
+    lastSnapshotDay: this.lastScheduledSnapshotDay || null,
+    browserTime: new Date().toISOString()
+  });
+
+  if (source === 'poll' && this.lastScheduledSnapshotDay && this.lastScheduledSnapshotDay !== previousLastDay) {
+    console.log('%c[REPORT-SCHEDULE][FRONT] Snapshot automatico detectado en backend', 'color:#22c55e;font-weight:bold;', {
+      scheduledTimeLocal: this.scheduledTime || null,
+      scheduledTimeServer: this.scheduledTimeServer || null,
+      lastSnapshotDay: this.lastScheduledSnapshotDay
+    });
   }
 
-  const [hour, minute] = this.scheduledTime.split(':').map(Number);
+  if (source === 'save' && previousTime !== this.scheduledTime) {
+    const nextRun = this.computeNextScheduledRunLabel(this.scheduledTime);
+    console.log('%c[REPORT-SCHEDULE][FRONT] Programacion actualizada con conversion local->servidor.', 'color:#f59e0b;font-weight:bold;', {
+      previousTime: previousTime || null,
+      newTimeLocal: this.scheduledTime || null,
+      newTimeServer: this.scheduledTimeServer || null,
+      lastSnapshotDay: this.lastScheduledSnapshotDay || null,
+      nextExpectedRun: nextRun
+    });
+  }
+
+  this.cdr.markForCheck();
+}
+
+private computeNextScheduledRunLabel(rawTime: string | null | undefined): string | null {
+  const value = (rawTime || '').trim();
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [hour, minute] = value.split(':').map(Number);
   const now = new Date();
+  const nextRun = new Date(now);
+  nextRun.setSeconds(0, 0);
+  nextRun.setHours(hour, minute, 0, 0);
 
-  console.log(`Hora actual: ${now.toLocaleTimeString()}`);
-  console.log(`Hora programada: ${this.scheduledTime}`);
-
-  const todayScheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
-  console.log(`Hora programada hoy: ${todayScheduled.toLocaleTimeString()}`);
-
-  const todayKey = now.toDateString();
-  const lastRun = localStorage.getItem('lastDailyReportDate');
-
-  console.log(`Clave de hoy: ${todayKey}`);
-  console.log(`Último reporte generado: ${lastRun || 'Ninguno'}`);
-
-  const scheduledTimePassed = now >= todayScheduled;
-  const alreadyGeneratedToday = lastRun === todayKey;
-
-  console.log(`¿Ya pasó la hora programada? ${scheduledTimePassed ? 'SÍ' : 'NO'}`);
-  console.log(`¿Ya se generó hoy? ${alreadyGeneratedToday ? 'SÍ' : 'NO'}`);
-
-  if (scheduledTimePassed && !alreadyGeneratedToday) {
-    console.log('%cGENERANDO REPORTE AUTOMÁTICO AHORA', 'color: #10b981; font-weight: bold; font-size: 1.2em;');
-    this.generateAndSaveReport(false);
-    localStorage.setItem('lastDailyReportDate', todayKey);
-    console.log('Reporte marcado como generado para hoy');
-  } else if (scheduledTimePassed && alreadyGeneratedToday) {
-    console.log('El reporte automático ya se generó hoy. No se vuelve a generar.');
-  } else {
-    console.log('Aún no es hora del reporte automático. Esperando...');
+  if (nextRun <= now) {
+    nextRun.setDate(nextRun.getDate() + 1);
   }
+
+  return nextRun.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
+private localTimeToServerTime(localTime: string | null | undefined): string | null {
+  const value = (localTime || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [hour, minute] = value.split(':').map(Number);
+  const localCandidate = new Date();
+  localCandidate.setHours(hour, minute, 0, 0);
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: this.reportServerTimeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(localCandidate);
+}
+
+private serverTimeToLocalTime(serverTime: string | null | undefined): string | null {
+  const value = (serverTime || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [hour, minute] = value.split(':').map(Number);
+  const now = new Date();
+  const serverDateParts = this.getDatePartsForTimeZone(now, this.reportServerTimeZone);
+  const utcGuess = Date.UTC(serverDateParts.year, serverDateParts.month - 1, serverDateParts.day, hour, minute, 0, 0);
+  const serverOffset = this.getTimeZoneOffsetMinutes(new Date(utcGuess), this.reportServerTimeZone);
+  const instant = new Date(utcGuess - serverOffset * 60000);
+
+  return `${String(instant.getHours()).padStart(2, '0')}:${String(instant.getMinutes()).padStart(2, '0')}`;
+}
+
+private getDatePartsForTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  const parts = formatter.formatToParts(date);
+  return {
+    year: Number(parts.find(part => part.type === 'year')?.value || date.getFullYear()),
+    month: Number(parts.find(part => part.type === 'month')?.value || date.getMonth() + 1),
+    day: Number(parts.find(part => part.type === 'day')?.value || date.getDate())
+  };
+}
+
+private getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(date);
+  const year = Number(parts.find(part => part.type === 'year')?.value);
+  const month = Number(parts.find(part => part.type === 'month')?.value);
+  const day = Number(parts.find(part => part.type === 'day')?.value);
+  const hour = Number(parts.find(part => part.type === 'hour')?.value);
+  const minute = Number(parts.find(part => part.type === 'minute')?.value);
+  const second = Number(parts.find(part => part.type === 'second')?.value);
+  const utcTime = Date.UTC(year, month - 1, day, hour, minute, second);
+
+  return (utcTime - date.getTime()) / 60000;
+}
+
+
+
+
+
+private shouldRefreshLiveStats(): boolean {
+  const spacesArray = Object.values(this.spaces || {});
+  if (spacesArray.some(space => !!space?.occupied && !!space?.startTime)) {
+    return true;
+  }
+
+  return (this.dailyClients || []).some(client => this.toTimestamp(client?.entryTimestamp) !== null);
+}
 
 private applyDailyClientFiltersAndPagination(): void {
   const source = this.dailyClients || [];
@@ -1037,7 +1571,7 @@ private applyDailyClientFiltersAndPagination(): void {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / this.pageSizeDaily));
 
-  // Ajustar página actual si quedó fuera de rango
+  // Ajustar pÃ¡gina actual si quedÃ³ fuera de rango
   if (this.currentPageDaily > totalPages) {
     this.currentPageDaily = totalPages;
   }
@@ -1063,13 +1597,41 @@ private applyDailyClientFiltersAndPagination(): void {
 
 
 generateAndSaveReport(isManual: boolean = false): void {
+  if (!isManual) {
+    this.executeGenerateAndSaveReport(false);
+    return;
+  }
+  void this.generateAndSaveReportWithConfirm(isManual);
+}
+
+private async generateAndSaveReportWithConfirm(isManual: boolean): Promise<void> {
+  const servicesCount = (this.dailyClients || []).length;
+  const confirmed = await this.confirmService.confirm({
+    title: isManual ? 'Generar reporte diario' : 'Generar snapshot diario',
+    message: isManual
+      ? `Se generara un reporte diario manual con ${servicesCount} servicio(s) registrados hoy. Deseas continuar?`
+      : `Se generara un snapshot diario automatico con ${servicesCount} servicio(s) registrados hoy. Deseas continuar?`,
+    confirmText: isManual ? 'Generar reporte' : 'Generar snapshot',
+    cancelText: 'Cancelar',
+    variant: 'warning'
+  });
+
+  if (!confirmed) {
+    this.showInfoToast('Generacion del reporte diario cancelada.');
+    return;
+  }
+
+  this.executeGenerateAndSaveReport(isManual);
+}
+
+private executeGenerateAndSaveReport(isManual: boolean = false): void {
   const type = isManual ? 'MANUAL' : 'AUTOMATICO';
   console.log(`%cINICIANDO GENERACION DE REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
 
   const clientsForReport = this.dailyClients || [];
   const enrichedClients = this.enrichClientsForReport(clientsForReport);
 
-  // ✅ periodKey local (evita problemas UTC cerca de medianoche)
+  // âœ… periodKey local (evita problemas UTC cerca de medianoche)
   const now = new Date();
   //const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -1082,7 +1644,7 @@ generateAndSaveReport(isManual: boolean = false): void {
     enrichedClients: enrichedClients.length
   });
 
-  this.http.get<Report[]>(`${this.API_BASE}/reports`).pipe(
+  this.reportsApi.getAll().pipe(
     map((reports) => (reports || []).filter(r => this.isSameDailyReportByPeriodKey(r, periodKey))),
     switchMap((existingDailyReports) => {
       const existingClients = existingDailyReports.flatMap(r => this.parseJsonArraySafe(r.filteredClients));
@@ -1103,28 +1665,29 @@ generateAndSaveReport(isManual: boolean = false): void {
         return of(null);
       }
 
-      // Construir payload consolidado del día (pero NO final)
+      // Construir payload consolidado del dÃ­a (pero NO final)
       const reportData: any = this.buildDailyReportPayloadMerged(mergedClients, periodKey);
-      reportData.dailyFinal = false; // ✅ manual/auto intermedio
+      reportData.dailyFinal = false; // âœ… manual/auto intermedio
 
       console.log('[DIARIO] payload consolidado (dailyFinal=false):', reportData);
 
-      // Borrar diarios previos del mismo día y recrear consolidado único
+      // Borrar diarios previos del mismo dÃ­a y recrear consolidado Ãºnico
       const deleteCalls = existingDailyReports.map(r =>
-        this.http.delete<void>(`${this.API_BASE}/reports/${r.id}`).pipe(
+        this.reportsApi.delete(r.id).pipe(
           catchError((err) => {
             console.warn('[DIARIO] Error borrando reporte diario previo', { reportId: r.id, err });
-            // No aborta; seguimos para no bloquear operación del usuario
+            // No aborta; seguimos para no bloquear operaciÃ³n del usuario
             return of(void 0);
           })
         )
       );
 
       return (deleteCalls.length ? forkJoin(deleteCalls) : of([])).pipe(
-        switchMap(() => this.http.post<Report>(`${this.API_BASE}/reports`, reportData)),
+        switchMap(() => this.reportsApi.create(reportData)),
         map((savedReport) => ({ savedReport, reportData, periodKey }))
       );
-    })
+    }),
+    takeUntil(this.destroy$)
   ).subscribe({
     next: (result) => {
       if (!result) return;
@@ -1155,8 +1718,8 @@ generateAndSaveReport(isManual: boolean = false): void {
 
       this.showSuccessToast(
         isManual
-          ? 'Reporte diario generado/actualizado (consolidado del día, no final)'
-          : 'Reporte diario automático generado/actualizado (no final)'
+          ? 'Reporte diario generado/actualizado (consolidado del dÃ­a, no final)'
+          : 'Reporte diario automÃ¡tico generado/actualizado (no final)'
       );
     },
     error: (error) => {
@@ -1195,15 +1758,9 @@ private mergeAndDedupDailyReportClients(existingClients: any[], currentClients: 
   const dedup = new Map<string, any>();
 
   for (const c of merged) {
-    const key = [
-      c?.id ?? 'x',
-      c?.code ?? 'x',
-      c?.entryTimestamp ?? 'x',
-      c?.exitTimestamp ?? 'x'
-    ].join('|');
-
-    // Si colisiona, el último reemplaza al anterior (útil si viene más completo)
-    dedup.set(key, c);
+    const key = this.buildDailyReportClientKey(c);
+    const previous = dedup.get(key);
+    dedup.set(key, previous ? this.mergeDailyReportClientSnapshots(previous, c) : c);
   }
 
   const result = Array.from(dedup.values()).sort((a, b) =>
@@ -1219,6 +1776,74 @@ private mergeAndDedupDailyReportClients(existingClients: any[], currentClients: 
   });
 
   return result;
+}
+
+private buildDailyReportClientKey(client: any): string {
+  const id = this.normalizeSnapshotText(client?.id);
+  const entryTs = this.toEpoch(client?.entryTimestamp);
+  const code = this.normalizeSnapshotText(client?.code);
+
+  if (id) {
+    return `id:${id}|entry:${entryTs ?? 'x'}`;
+  }
+
+  if (code || entryTs !== null) {
+    return `code:${code ?? 'x'}|entry:${entryTs ?? 'x'}`;
+  }
+
+  const dni = this.normalizeSnapshotText(client?.dni);
+  const phone = this.normalizeSnapshotDigits(client?.phoneIntl);
+  const name = this.normalizeSnapshotText(client?.name)?.toLowerCase();
+  return `fallback:${dni ?? 'x'}|${phone ?? 'x'}|${name ?? 'x'}`;
+}
+
+private mergeDailyReportClientSnapshots(previous: any, incoming: any): any {
+  const merged = { ...(previous || {}) };
+
+  for (const [key, value] of Object.entries(incoming || {})) {
+    if (this.isMeaningfulSnapshotValue(value)) {
+      merged[key] = value;
+    }
+  }
+
+  const previousEntry = this.toEpoch(previous?.entryTimestamp);
+  const incomingEntry = this.toEpoch(incoming?.entryTimestamp);
+  if (incomingEntry !== null || previousEntry !== null) {
+    merged.entryTimestamp = incomingEntry ?? previousEntry;
+  }
+
+  const previousExit = this.toEpoch(previous?.exitTimestamp);
+  const incomingExit = this.toEpoch(incoming?.exitTimestamp);
+  if (incomingExit !== null || previousExit !== null) {
+    merged.exitTimestamp = incomingExit ?? previousExit;
+  }
+
+  return merged;
+}
+
+private normalizeSnapshotText(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (!text || text.toLowerCase() === 'null' || text.toLowerCase() === 'x') {
+    return null;
+  }
+  return text;
+}
+
+private normalizeSnapshotDigits(value: any): string | null {
+  const text = this.normalizeSnapshotText(value);
+  if (!text) return null;
+  const digits = text.replace(/\D+/g, '');
+  return digits || null;
+}
+
+private isMeaningfulSnapshotValue(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return !!trimmed && trimmed.toLowerCase() !== 'null';
+  }
+  return true;
 }
 
 
@@ -1261,7 +1886,7 @@ private buildDailyReportPayloadMerged(mergedClients: any[], periodKey: string) {
     occupancyRate: this.occupancyRate,
     subsueloStats: JSON.stringify(this.subsueloStats),
 
-    // Recalculados desde servicios fusionados del día
+    // Recalculados desde servicios fusionados del dÃ­a
     timeStats: JSON.stringify(mergedTimeStats),
     filteredClients: JSON.stringify(mergedClients),
     paymentAmounts: JSON.stringify(paymentAmounts),
@@ -1280,7 +1905,7 @@ private buildDailyReportPayloadMerged(mergedClients: any[], periodKey: string) {
 }
 
 
-// En reports.component.ts - Métodos de Toast (CORREGIDOS)
+// En reports.component.ts - MÃ©todos de Toast (CORREGIDOS)
 
 showSuccessToast(message: string): void {
   this.toastService.showSuccess(message);
@@ -1292,6 +1917,10 @@ showErrorToast(message: string): void {
 
 showWarningToast(message: string): void {
   this.toastService.showWarning(message);
+}
+
+showInfoToast(message: string): void {
+  this.toastService.showInfo(message);
 }
 
 getSpaceByKey(spaceKey: string | null): Space | undefined {
@@ -1327,7 +1956,7 @@ private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
   const space = this.getSpaceByKey(spaceKey);
 
   const deleteFromBDAndUpdateUI = () => {
-    this.autolavadoService.deleteClientFromBackend(client.id).subscribe({
+    this.autolavadoService.deleteClientFromBackend(client.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         delete this.paymentColorsByClientId[client.id.toString()];
         this.savePaymentColors();
@@ -1337,8 +1966,8 @@ private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
           (this.currentPageDaily - 1) * this.pageSizeDaily,
           (this.currentPageDaily - 1) * this.pageSizeDaily + this.pageSizeDaily
         );
-        this.cdr.detectChanges();
         this.showSuccessToast(`Servicio de ${clientName} eliminado correctamente`);
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Error al eliminar cliente', err);
@@ -1348,9 +1977,14 @@ private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
   };
 
   if (space && space.occupied) {
-    this.autolavadoService.releaseSpace(spaceKey).subscribe({
+    this.autolavadoService.releaseSpace(spaceKey).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => deleteFromBDAndUpdateUI(),
       error: (err) => {
+        if (Number(err?.status || 0) === 0) {
+          this.showWarningToast('Espacio liberado localmente. Se sincronizara cuando vuelva la conexion.');
+          return;
+        }
+
         console.error('Error al liberar espacio', err);
         this.showErrorToast('Error al liberar el espacio. El servicio no se elimino.');
       }
@@ -1380,17 +2014,18 @@ generateReport(): void {
   console.log('Enviando reporte al backend:', reportData);
 
   // POST al backend
-  this.http.post<any>(`${this.API_BASE}/reports`, reportData).pipe(
+  this.reportsApi.create(reportData).pipe(
     catchError(error => {
       console.error('Error saving report to backend', error);
       this.showWarningToast('Reporte descargado localmente, pero hubo un error al guardarlo en backend: ' + error.message);
       return of(null);
-    })
+    }),
+    takeUntil(this.destroy$)
   ).subscribe(response => {
     console.log('Reporte guardado en backend:', response);
   });
 
-  // Generación y descarga HTML local (tu código original)
+  // GeneraciÃ³n y descarga HTML local (tu cÃ³digo original)
   const reportHtml = `
 <!DOCTYPE html>
 <html lang="es">
@@ -1438,7 +2073,7 @@ generateReport(): void {
       </div>
       <div class="stat-card">
         <div class="stat-number" style="color: #f59e0b;">${this.occupancyRate}%</div>
-        <div>Ocupación</div>
+        <div>OcupaciÃ³n</div>
       </div>
     </div>
   </div>
@@ -1452,7 +2087,7 @@ generateReport(): void {
           <th>Total</th>
           <th>Ocupados</th>
           <th>Libres</th>
-          <th>% Ocupación</th>
+          <th>% OcupaciÃ³n</th>
         </tr>
       </thead>
       <tbody>
@@ -1476,7 +2111,7 @@ generateReport(): void {
   </div>
 
   <div class="section">
-    <h2>Distribución por Tiempo</h2>
+    <h2>DistribuciÃ³n por Tiempo</h2>
     <div class="time-stats">
       <div class="time-card">
         <div class="time-number" style="color: #10b981;">${this.timeStats.under1h}</div>
@@ -1488,7 +2123,7 @@ generateReport(): void {
       </div>
       <div class="time-card">
         <div class="time-number" style="color: #ef4444;">${this.timeStats.over3h}</div>
-        <div>Más de 3h</div>
+        <div>MÃ¡s de 3h</div>
       </div>
     </div>
   </div>
@@ -1499,11 +2134,11 @@ generateReport(): void {
       <table>
         <thead>
           <tr>
-            <th>Código</th>
+            <th>CÃ³digo</th>
             <th>Cliente</th>
             <th>Espacio</th>
-            <th>Teléfono</th>
-            <th>Vehículo</th>
+            <th>TelÃ©fono</th>
+            <th>VehÃ­culo</th>
             <th>Tiempo</th>
           </tr>
         </thead>
@@ -1649,10 +2284,46 @@ private getReportTotalCobrado(report: Report): number {
 
 
 generateAndSaveMonthlyReport(isManual: boolean = true): void {
+  if (!isManual) {
+    this.executeGenerateAndSaveMonthlyReport(false, this.isTodayEndOfMonth());
+    return;
+  }
+  void this.generateAndSaveMonthlyReportWithConfirm(isManual);
+}
+
+private async generateAndSaveMonthlyReportWithConfirm(isManual: boolean): Promise<void> {
+  const isEndOfMonth = this.isTodayEndOfMonth();
+  const now = new Date();
+  const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const todayLabel = now.toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const confirmed = await this.confirmService.confirm({
+    title: isEndOfMonth ? 'Generar reporte mensual' : 'Generar acumulado del mes',
+    message: isEndOfMonth
+      ? `Hoy es ${todayLabel}. Estas al cierre del mes de ${monthLabel}. Deseas generar el reporte mensual definitivo?`
+      : `Hoy es ${todayLabel}. Aun no estamos a fin de mes.\n\nSi continuas, se generara un reporte acumulado del mes de ${monthLabel} hasta la fecha de hoy, no el cierre mensual definitivo. Deseas continuar?`,
+    confirmText: isEndOfMonth ? 'Generar mensual' : 'Generar acumulado',
+    cancelText: 'Cancelar',
+    variant: 'warning'
+  });
+
+  if (!confirmed) {
+    this.showInfoToast('Generacion del reporte mensual cancelada.');
+    return;
+  }
+
+  this.executeGenerateAndSaveMonthlyReport(isManual, isEndOfMonth);
+}
+
+private executeGenerateAndSaveMonthlyReport(isManual: boolean = true, isEndOfMonth = this.isTodayEndOfMonth()): void {
   const type = isManual ? 'MENSUAL-MANUAL' : 'MENSUAL-AUTO';
   const now = new Date();
 
-  // ✅ monthKey local (evita desfase por UTC cerca de medianoche)
+  // âœ… monthKey local (evita desfase por UTC cerca de medianoche)
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
@@ -1665,17 +2336,17 @@ generateAndSaveMonthlyReport(isManual: boolean = true): void {
   console.log(`%cINICIANDO REPORTE ${type}`, 'color: #0ea5e9; font-weight: bold;');
   console.log('[MENSUAL] monthKey local:', monthKey);
 
-  // ✅ El backend aplica la lógica correcta:
+  // âœ… El backend aplica la lÃ³gica correcta:
   //    - preferir DAILY con dailyFinal=true
-  //    - fallback al último DAILY por día si no hay final
-  this.http.post<Report>(`${this.API_BASE}/reports/monthly/generate?month=${monthKey}`, {}).subscribe({
+  //    - fallback al Ãºltimo DAILY por dÃ­a si no hay final
+  this.reportsApi.generateMonthly(monthKey).pipe(takeUntil(this.destroy$)).subscribe({
     next: (savedReport) => {
       console.log('[MENSUAL] Reporte mensual generado por backend', savedReport);
 
       const detailHtml = this.autolavadoService.generateReportDetailHtml(
         savedReport as Report,
         {
-          periodLabel: 'Servicios del mes',
+          periodLabel: isEndOfMonth ? 'Servicios del mes' : 'Servicios acumulados del mes',
           periodDateLabel: `${monthLabel} hasta ${runDateLabel}`
         }
       );
@@ -1692,7 +2363,11 @@ generateAndSaveMonthlyReport(isManual: boolean = true): void {
 
       URL.revokeObjectURL(url);
 
-      this.showSuccessToast(`Reporte mensual generado (${monthLabel})`);
+      this.showSuccessToast(
+        isEndOfMonth
+          ? `Reporte mensual generado (${monthLabel})`
+          : `Reporte acumulado del mes generado hasta hoy (${monthLabel})`
+      );
     },
     error: (error) => {
       console.error('[MENSUAL] Error generando reporte mensual en backend', error);
@@ -1701,6 +2376,20 @@ generateAndSaveMonthlyReport(isManual: boolean = true): void {
   });
 }
 
+private isTodayEndOfMonth(): boolean {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  return now.getMonth() !== tomorrow.getMonth();
+}
+
+get monthlyReportButtonLabel(): string {
+  return this.isTodayEndOfMonth()
+    ? 'Generar Mensual + Guardar'
+    : 'Generar Acumulado + Guardar';
+}
+
 
 
 }
+
