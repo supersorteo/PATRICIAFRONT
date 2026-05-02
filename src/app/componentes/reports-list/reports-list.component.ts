@@ -149,7 +149,8 @@ export class ReportsListComponent implements OnInit{
       },
       error: (error) => {
         console.error('Error deleting report', error);
-        this.toastService.showError('Error al eliminar el reporte.');
+        const msg = error?.error?.error ?? 'Error al eliminar el reporte.';
+        this.toastService.showError(msg);
       }
     });
   }

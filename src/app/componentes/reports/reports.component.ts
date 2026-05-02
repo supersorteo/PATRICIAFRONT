@@ -158,6 +158,7 @@ paginatedDailyClientsList: Client[] = []; // Lista paginada real
 
 private statsRefreshIntervalId: any = null;
 private scheduleStatusPollId: any = null;
+private scheduleConfigRetryTimeoutId: any = null;
 
   constructor(
     private autolavadoService: AutolavadoService,
@@ -247,6 +248,10 @@ this.loadPaymentColors();
   if (this.scheduleStatusPollId) {
     clearInterval(this.scheduleStatusPollId);
     this.scheduleStatusPollId = null;
+  }
+  if (this.scheduleConfigRetryTimeoutId) {
+    clearTimeout(this.scheduleConfigRetryTimeoutId);
+    this.scheduleConfigRetryTimeoutId = null;
   }
 
   this.destroy$.next();
@@ -527,9 +532,12 @@ loadStats(): void {
 private fetchStatsByRange(from: string, to: string): void {
   this.isLoadingStats = true;
   this.cdr.markForCheck();
+  const today = this.formatDateInputValue(new Date());
   this.autolavadoService.getServiceHistoryByDateRange(from, to).pipe(
     map(historyServices => this.mergeStatsServices(
-      historyServices,
+      (historyServices || []).filter(service =>
+        !(service.serviceDate === today && service.archivedBy === 'REPORT_BACKFILL')
+      ),
       this.rangeIncludesToday(from, to) ? this.buildLiveStatsServices(from, to) : []
     )),
     takeUntil(this.destroy$)
@@ -595,12 +603,7 @@ private mergeStatsServices(historyServices: HistoricalService[], liveServices: H
   const merged = new Map<string, HistoricalService>();
 
   for (const service of [...(historyServices || []), ...(liveServices || [])]) {
-    const key = [
-      service.sourceClientId ?? service.id ?? 'anon',
-      service.entryTimestamp ?? 0,
-      (service.vehicle || '').trim().toLowerCase(),
-      (service.plate || '').trim().toLowerCase()
-    ].join('|');
+    const key = this.buildStatsServiceKey(service);
 
     const previous = merged.get(key);
     merged.set(key, {
@@ -614,6 +617,33 @@ private mergeStatsServices(historyServices: HistoricalService[], liveServices: H
     const bTs = b.entryTimestamp || b.exitTimestamp || 0;
     return bTs - aTs;
   });
+}
+
+private buildStatsServiceKey(service: HistoricalService): string {
+  const code = (service.code || '').trim().toLowerCase();
+  const dni = (service.dni || '').trim();
+  const phoneIntl = (service.phoneIntl || '').replace(/\D/g, '');
+  const phoneRaw = (service.phoneRaw || '').replace(/\D/g, '');
+  const name = (service.name || '').trim().toLowerCase();
+  const plate = (service.plate || '').trim().toLowerCase();
+  const vehicle = (service.vehicle || '').trim().toLowerCase();
+  const entryTs = service.entryTimestamp ?? 0;
+  const exitTs = service.exitTimestamp ?? 0;
+
+  const identity = code
+    || (dni ? `dni:${dni}` : '')
+    || (phoneIntl ? `phone:${phoneIntl}` : '')
+    || (phoneRaw ? `phone:${phoneRaw}` : '')
+    || (name ? `name:${name}` : '')
+    || `src:${service.sourceClientId ?? service.id ?? 'anon'}`;
+
+  return [
+    identity,
+    entryTs,
+    exitTs,
+    vehicle,
+    plate
+  ].join('|');
 }
 
 
@@ -1459,12 +1489,37 @@ saveScheduledTime(): void {
 private loadReportScheduleConfig(source: 'init' | 'poll' | 'save' = 'init'): void {
   this.reportsApi.getScheduleConfig().pipe(takeUntil(this.destroy$)).subscribe({
     next: (config) => {
+      if (this.scheduleConfigRetryTimeoutId) {
+        clearTimeout(this.scheduleConfigRetryTimeoutId);
+        this.scheduleConfigRetryTimeoutId = null;
+      }
       this.applyScheduleConfig(config, source);
     },
     error: (error) => {
+      if (error?.status === 0) {
+        if (source !== 'poll') {
+          console.warn('[REPORT-SCHEDULE][FRONT] Backend aun no disponible o reiniciando. Se reintentara luego.', {
+            source,
+            url: error?.url || null
+          });
+          this.scheduleRetryLoadReportScheduleConfig();
+        }
+        return;
+      }
       console.error('Error cargando configuracion de reporte automatico', error);
     }
   });
+}
+
+private scheduleRetryLoadReportScheduleConfig(): void {
+  if (this.scheduleConfigRetryTimeoutId) {
+    return;
+  }
+
+  this.scheduleConfigRetryTimeoutId = setTimeout(() => {
+    this.scheduleConfigRetryTimeoutId = null;
+    this.loadReportScheduleConfig('init');
+  }, 5000);
 }
 
 private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, source: 'init' | 'poll' | 'save'): void {
@@ -1789,8 +1844,8 @@ private executeGenerateAndSaveReport(isManual: boolean = false): void {
 
       this.showSuccessToast(
         isManual
-          ? 'Reporte diario generado/actualizado (consolidado del dÃ­a, no final)'
-          : 'Reporte diario automÃ¡tico generado/actualizado (no final)'
+          ? 'Reporte diario generado/actualizado (consolidado del dí­a, no final)'
+          : 'Reporte diario automático generado/actualizado (no final)'
       );
     },
     error: (error) => {
