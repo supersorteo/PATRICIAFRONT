@@ -1533,43 +1533,13 @@ private syncClientVehiclesListToBackend(
     return;
   }
 
-  this.fetchReservationsByDni$(dni).pipe(
-    map((reservations) => this.sortReservationsDesc(reservations)),
-    switchMap((rows) => {
-      if (!rows.length) {
-        return of(null);
-      }
-
-      const latestClient = rows[0];
-      return this.autolavadoService.updateClientInBackend(latestClient.id, {
-        clientVehicles: clientVehiclesPayload
-      });
-    })
-  ).subscribe({
-    next: (updatedClient) => {
-      if (!updatedClient) {
-        console.log('[Vehicles] Sync omitido: no existe cliente backend para ese DNI');
-        return;
-      }
-
-      this.clientVehiclesList = this.mapClientVehiclesFromBackend(updatedClient);
+  this.autolavadoService.updateClientVehiclesByDni(dni, clientVehiclesPayload).subscribe({
+    next: () => {
       this.persistCurrentClientVehicles();
 
-      const currentVehicle = (this.clientForm.get('vehicle')?.value || '').toString().trim();
-      const matched = this.clientVehiclesList.find(v =>
-        this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(currentVehicle)
-      );
-
-      if (matched) {
-        this.clientForm.patchValue({
-          plate: matched.plate || '',
-          notes: matched.notes || ''
-        }, { emitEvent: false });
-      }
-
-      console.log('[Vehicles] Sync backend OK', {
+      console.log('[Vehicles] Sync backend OK (todos los registros del DNI)', {
         reason,
-        clientId: updatedClient.id,
+        dni,
         vehicles: this.clientVehiclesList
       });
     },
@@ -1601,18 +1571,19 @@ private normalizeVehicleModel(model: string | null | undefined): string {
 
 
 private upsertClientVehicleInList(item: ClientVehicleItem): void {
-  const modelNorm = this.normalizeVehicleModel(item.model);
-  if (!modelNorm) return;
-
-  const idx = this.clientVehiclesList.findIndex(v =>
-    this.normalizeVehicleModel(v.model) === modelNorm
-  );
-
   const incoming: ClientVehicleItem = {
     model: (item.model || '').toString().trim(),
     plate: (item.plate || '').toString().trim(),
     notes: (item.notes || '').toString().trim()
   };
+
+  const modelNorm = this.normalizeVehicleModel(incoming.model);
+  if (!modelNorm) return;
+
+  const incomingKey = this.buildClientVehicleIdentityKey(incoming);
+  const idx = this.clientVehiclesList.findIndex(v =>
+    this.buildClientVehicleIdentityKey(v) === incomingKey
+  );
 
   if (idx >= 0) {
     const existing = this.clientVehiclesList[idx];
@@ -1626,8 +1597,17 @@ private upsertClientVehicleInList(item: ClientVehicleItem): void {
     return;
   }
 
+  // If the same model already exists (any plate/notes), skip to prevent duplicates.
+  // Plate/notes updates must be done explicitly via Edit in the vehicles modal.
+  const sameModelIdx = this.clientVehiclesList.findIndex(v =>
+    this.normalizeVehicleModel(v.model) === modelNorm
+  );
+  if (sameModelIdx >= 0) {
+    return;
+  }
+
   if (this.clientVehiclesList.length >= 4) {
-    throw new Error('Solo se permiten hasta 4 vehículos por cliente.');
+    throw new Error('Solo se permiten hasta 4 vehiculos por cliente.');
   }
 
   this.clientVehiclesList.push(incoming);
@@ -1705,7 +1685,8 @@ openClientVehiclesModal(): void {
     return;
   }
 
-  // Con DNI: backend-first
+  // Con DNI: backend-first — limpiar lista anterior para evitar mostrar datos de otro cliente
+  this.clientVehiclesList = [];
   this.isLoadingClientVehiclesModal = true;
   this.showClientVehiclesModal = true;
 
@@ -2951,7 +2932,7 @@ private buildClientVehiclesPayload(): Array<{
   plate: string;
   notes: string;
 }> {
-  const seenTypeIds = new Set<number>();
+  const seenVehicleKeys = new Set<string>();
   const payload: Array<{ vehicleType: { id: number }; plate: string; notes: string }> = [];
 
   for (const item of this.clientVehiclesList || []) {
@@ -2960,25 +2941,16 @@ private buildClientVehiclesPayload(): Array<{
 
     const vt = this.vehicles.find(v => (v.model || '').toLowerCase() === model.toLowerCase());
     if (!vt?.id) {
-      console.warn('[buildClientVehiclesPayload] Modelo sin VehicleType en catálogo, se omite:', model);
+      console.warn('[buildClientVehiclesPayload] Modelo sin VehicleType en catalogo, se omite:', model);
       continue;
     }
 
-    if (seenTypeIds.has(vt.id)) {
-      // Evitar duplicados por mismo vehicleType
-      const idx = payload.findIndex(p => p.vehicleType.id === vt.id);
-      if (idx >= 0) {
-        // No pisar datos buenos con vacíos
-        payload[idx] = {
-          vehicleType: { id: vt.id },
-          plate: (item.plate || '').toString().trim() || payload[idx].plate || '',
-          notes: (item.notes || '').toString().trim() || payload[idx].notes || ''
-        };
-      }
+    const vehicleKey = `${vt.id}::${this.buildClientVehicleIdentityKey(item)}`;
+    if (seenVehicleKeys.has(vehicleKey)) {
       continue;
     }
 
-    seenTypeIds.add(vt.id);
+    seenVehicleKeys.add(vehicleKey);
     payload.push({
       vehicleType: { id: vt.id },
       plate: (item.plate || '').toString().trim(),
@@ -2987,7 +2959,7 @@ private buildClientVehiclesPayload(): Array<{
   }
 
   if (payload.length > 4) {
-    throw new Error('Solo se permiten hasta 4 vehículos por cliente.');
+    throw new Error('Solo se permiten hasta 4 vehiculos por cliente.');
   }
 
   return payload;
@@ -3242,19 +3214,22 @@ private refreshClientReservationsFromBackendByDni(dni: string): void {
 
       // Rehidratar lista de vehículos desde backend (fuente real)
       if (latest.clientVehicles?.length) {
-        this.clientVehiclesList = latest.clientVehicles.map(cv => ({
-          model: cv.vehicleType?.model || '',
-          plate: cv.plate || '',
-          notes: cv.notes || ''
-        }));
+        this.clientVehiclesList = this.mapClientVehiclesFromBackend(latest);
       }
 
       // Si el formulario sigue apuntando al mismo DNI, refrescar campos visibles
       const currentFormDni = (this.clientForm.get('dni')?.value || '').toString().trim();
       if (currentFormDni === safeDni) {
-        const currentFormVehicle = (this.clientForm.get('vehicle')?.value || '').toString().trim();
+        const currentFormVehicle: ClientVehicleItem = {
+          model: (this.clientForm.get('vehicle')?.value || '').toString().trim(),
+          plate: (this.clientForm.get('plate')?.value || '').toString().trim(),
+          notes: (this.clientForm.get('notes')?.value || '').toString().trim()
+        };
+        const selectedKey = this.buildClientVehicleIdentityKey(currentFormVehicle);
         const match = this.clientVehiclesList.find(v =>
-          this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(currentFormVehicle)
+          this.buildClientVehicleIdentityKey(v) === selectedKey
+        ) || this.clientVehiclesList.find(v =>
+          this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(currentFormVehicle.model)
         );
 
         if (match) {
@@ -3291,11 +3266,26 @@ private sortReservationsDesc(reservations: Client[]): Client[] {
 private mapClientVehiclesFromBackend(client: Client): ClientVehicleItem[] {
   if (!client?.clientVehicles?.length) return [];
 
-  return client.clientVehicles.map(cv => ({
-    model: cv.vehicleType?.model || '',
-    plate: cv.plate || '',
-    notes: cv.notes || ''
-  }));
+  const dedup = new Map<string, ClientVehicleItem>();
+
+  for (const cv of client.clientVehicles) {
+    const candidate: ClientVehicleItem = {
+      model: cv.vehicleType?.model || '',
+      plate: cv.plate || '',
+      notes: cv.notes || ''
+    };
+    const key = this.buildClientVehicleIdentityKey(candidate);
+    if (!key) continue;
+
+    const previous = dedup.get(key);
+    dedup.set(key, {
+      model: candidate.model || previous?.model || '',
+      plate: candidate.plate || previous?.plate || '',
+      notes: candidate.notes || previous?.notes || ''
+    });
+  }
+
+  return Array.from(dedup.values());
 }
 
 private collectVehiclesFromReservations(reservations: Client[]): ClientVehicleItem[] {
@@ -3391,16 +3381,20 @@ private buildClientVehicleIdentityKey(vehicle: ClientVehicleItem | null | undefi
 private hydrateClientFormFromReservation(client: Client, reservations: Client[] = []): void {
   if (!client) return;
 
-  const backendVehicles = this.collectVehiclesFromReservations(reservations.length ? reservations : [client]);
+  // Use ONLY the latest reservation's clientVehicles as authoritative source.
+  // Aggregating across all historical reservations caused stale/deleted vehicles to re-appear.
+  const backendVehicles = this.mapClientVehiclesFromBackend(client);
   this.clientVehiclesList = backendVehicles;
 
   if (backendVehicles.length > 0) {
     const primaryVehicleItem = backendVehicles[0];
-    const primaryVehicleType = client.clientVehicles?.[0]?.vehicleType;
+    const primaryVehicleType = this.vehicles.find(v =>
+      this.normalizeVehicleModel(v.model) === this.normalizeVehicleModel(primaryVehicleItem?.model)
+    );
 
     this.clientForm.patchValue({
       name: client.name || '',
-      vehicle: primaryVehicleType?.model || client.vehicle || '',
+      vehicle: primaryVehicleItem?.model || client.vehicle || '',
       price: primaryVehicleType?.price || client.price || null,
       plate: primaryVehicleItem?.plate || client.plate || '',
       notes: primaryVehicleItem?.notes || client.notes || '',
@@ -3462,10 +3456,23 @@ private handleReservationsByDniResult(reservations: Client[]): void {
     ? `Cliente recuperado desde cache local. Se sincronizara con el servidor cuando vuelva la conexion.`
     : `Cliente recuperado desde el servidor.`;
 
+  const reservationsAudit = rows.map((reservation) => ({
+    id: reservation.id,
+    vehicle: reservation.vehicle,
+    plate: reservation.plate,
+    clientVehicles: (reservation.clientVehicles || []).map(cv => ({
+      model: cv.vehicleType?.model || '',
+      plate: cv.plate || '',
+      notes: cv.notes || ''
+    }))
+  }));
+
   console.log('[DNI] cliente hidratado desde backend', {
     dni: client.dni,
     clientId: client.id,
     reservations: rows.length,
+    reservationsAudit,
+    distinctVehiclesLoaded: this.clientVehiclesList.length,
     vehicles: this.clientVehiclesList
   });
 }

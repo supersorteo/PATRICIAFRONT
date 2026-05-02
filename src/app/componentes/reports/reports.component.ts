@@ -2,7 +2,7 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil, combineLatest, catchError, of, map, switchMap, forkJoin } from 'rxjs';
-import { Client, Report, Space, Subsuelo } from '../../models/autolavado.model';
+import { Client, HistoricalService, Report, Space, Subsuelo } from '../../models/autolavado.model';
 import { AutolavadoService } from '../../services/autolavado.service';
 import { ReportsListComponent } from "../reports-list/reports-list.component";
 import { FormatPhonePipe } from "../../services/format-phone.pipe";
@@ -111,7 +111,7 @@ pageSizeDaily = 5;
   statsSelectedWeekIndex = 0;
   statsSelectedYear = new Date().getFullYear();
   statsSelectedMonth = new Date().getMonth() + 1;
-  statsClients: Client[] = [];
+  statsClients: HistoricalService[] = [];
   statsCurrentPage = 1;
   readonly statsPageSize = 10;
   isLoadingStats = false;
@@ -527,11 +527,15 @@ loadStats(): void {
 private fetchStatsByRange(from: string, to: string): void {
   this.isLoadingStats = true;
   this.cdr.markForCheck();
-  this.autolavadoService.getClientsByDateRange(from, to).pipe(
+  this.autolavadoService.getServiceHistoryByDateRange(from, to).pipe(
+    map(historyServices => this.mergeStatsServices(
+      historyServices,
+      this.rangeIncludesToday(from, to) ? this.buildLiveStatsServices(from, to) : []
+    )),
     takeUntil(this.destroy$)
   ).subscribe({
-    next: clients => {
-      this.statsClients = clients;
+    next: services => {
+      this.statsClients = services;
       this.statsCurrentPage = 1;
       this.isLoadingStats = false;
       this.cdr.markForCheck();
@@ -542,6 +546,73 @@ private fetchStatsByRange(from: string, to: string): void {
       this.isLoadingStats = false;
       this.cdr.markForCheck();
     }
+  });
+}
+
+private rangeIncludesToday(from: string, to: string): boolean {
+  const today = this.formatDateInputValue(new Date());
+  return from <= today && today <= to;
+}
+
+private buildLiveStatsServices(from: string, to: string): HistoricalService[] {
+  const rangeStart = new Date(`${from}T00:00:00`).getTime();
+  const rangeEnd = new Date(`${to}T23:59:59`).getTime();
+
+  return Object.values(this.clients || {})
+    .filter(client => {
+      const entryTs = this.toTimestamp(client.entryTimestamp);
+      if (!entryTs || entryTs < rangeStart || entryTs > rangeEnd) {
+        return false;
+      }
+
+      const space = this.spaces[client.spaceKey || ''];
+      return !!space?.occupied;
+    })
+    .map(client => ({
+      id: Number(client.id) || 0,
+      sourceClientId: Number(client.id) || undefined,
+      code: client.code || '',
+      name: client.name || '',
+      dni: client.dni || '',
+      phoneIntl: client.phoneIntl || '',
+      phoneRaw: client.phoneRaw || '',
+      plate: client.plate || '',
+      notes: client.notes || '',
+      spaceKey: client.spaceKey || '',
+      vehicle: client.vehicle || '',
+      category: client.category || '',
+      price: client.price || 0,
+      paymentMethod: client.paymentMethod || '',
+      clover: client.clover ?? null,
+      entryTimestamp: this.toTimestamp(client.entryTimestamp),
+      exitTimestamp: this.toTimestamp(client.exitTimestamp),
+      serviceDate: from,
+      archivedBy: 'LIVE'
+    }));
+}
+
+private mergeStatsServices(historyServices: HistoricalService[], liveServices: HistoricalService[]): HistoricalService[] {
+  const merged = new Map<string, HistoricalService>();
+
+  for (const service of [...(historyServices || []), ...(liveServices || [])]) {
+    const key = [
+      service.sourceClientId ?? service.id ?? 'anon',
+      service.entryTimestamp ?? 0,
+      (service.vehicle || '').trim().toLowerCase(),
+      (service.plate || '').trim().toLowerCase()
+    ].join('|');
+
+    const previous = merged.get(key);
+    merged.set(key, {
+      ...(previous || {}),
+      ...service
+    });
+  }
+
+  return Array.from(merged.values()).sort((a, b) => {
+    const aTs = a.entryTimestamp || a.exitTimestamp || 0;
+    const bTs = b.entryTimestamp || b.exitTimestamp || 0;
+    return bTs - aTs;
   });
 }
 
@@ -573,7 +644,7 @@ formatEntryDate(ts: any): string {
   }
 }
 
-get paginatedStatsClients(): Client[] {
+get paginatedStatsClients(): HistoricalService[] {
   const start = (this.statsCurrentPage - 1) * this.statsPageSize;
   return this.statsClients.slice(start, start + this.statsPageSize);
 }
@@ -1743,13 +1814,14 @@ private isSameDailyReportByPeriodKey(report: Report, periodKey: string): boolean
   // Excluir mensuales
   if (report.periodType === 'MONTHLY') return false;
 
-  // Reportes nuevos con periodType/periodKey correctos
-  if (report.periodType === 'DAILY' && report.periodKey === periodKey) return true;
+  // Si el reporte ya tiene periodKey, esa es la fuente de verdad.
+  if (report.periodKey) {
+    return report.periodType === 'DAILY' && report.periodKey === periodKey;
+  }
 
-  // Compatibilidad legacy (reportes viejos sin periodType/periodKey)
+  // Compatibilidad solo para reportes legacy que realmente no tienen periodKey.
   const tsDay = (report.timestamp || '').slice(0, 10);
-  const looksDaily = !report.periodKey || report.periodKey.length === 10;
-  return looksDaily && tsDay === periodKey;
+  return tsDay === periodKey;
 }
 
 
@@ -1779,22 +1851,24 @@ private mergeAndDedupDailyReportClients(existingClients: any[], currentClients: 
 }
 
 private buildDailyReportClientKey(client: any): string {
-  const id = this.normalizeSnapshotText(client?.id);
   const entryTs = this.toEpoch(client?.entryTimestamp);
   const code = this.normalizeSnapshotText(client?.code);
-
-  if (id) {
-    return `id:${id}|entry:${entryTs ?? 'x'}`;
-  }
+  const dni = this.normalizeSnapshotText(client?.dni);
+  const phone = this.normalizeSnapshotDigits(client?.phoneIntl || client?.phoneRaw);
+  const name = this.normalizeSnapshotText(client?.name)?.toLowerCase();
+  const vehicle = this.normalizeSnapshotText(client?.vehicle)?.toLowerCase();
+  const plate = this.normalizeSnapshotText(client?.plate)?.toLowerCase();
+  const id = this.normalizeSnapshotText(client?.id);
 
   if (code || entryTs !== null) {
     return `code:${code ?? 'x'}|entry:${entryTs ?? 'x'}`;
   }
 
-  const dni = this.normalizeSnapshotText(client?.dni);
-  const phone = this.normalizeSnapshotDigits(client?.phoneIntl);
-  const name = this.normalizeSnapshotText(client?.name)?.toLowerCase();
-  return `fallback:${dni ?? 'x'}|${phone ?? 'x'}|${name ?? 'x'}`;
+  if (dni || phone || name) {
+    return `fallback:${dni ?? 'x'}|${phone ?? 'x'}|${name ?? 'x'}|${entryTs ?? 'x'}|${vehicle ?? 'x'}|${plate ?? 'x'}`;
+  }
+
+  return `id:${id ?? 'x'}|entry:${entryTs ?? 'x'}`;
 }
 
 private mergeDailyReportClientSnapshots(previous: any, incoming: any): any {

@@ -109,6 +109,10 @@ export class ClientsApiService {
     return this.http.put<Client>(`${this.apiBase}/clients/${clientId}`, updatedData);
   }
 
+  updateVehiclesByDni(dni: string, vehicles: any[]): Observable<void> {
+    return this.http.put<void>(`${this.apiBase}/clients/dni/${encodeURIComponent(dni)}/vehicles`, vehicles);
+  }
+
   getClientReservationsByDni(dni: string): Observable<Client[]> {
     return this.http.get<Client[]>(`${this.apiBase}/clients/dni/${dni}/reservas`);
   }

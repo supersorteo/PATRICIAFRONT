@@ -2,11 +2,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, combineLatest, forkJoin, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
-import { ClientVehicle, Report, VehicleType } from '../models/autolavado.model';
+import { ClientVehicle, HistoricalService, Report, VehicleType } from '../models/autolavado.model';
 import { environment } from '../../environments/environment';
 import { ClientsApiService } from './api/clients-api.service';
 import { OfflineSyncService } from './offline-sync.service';
 import { ReportsApiService } from './api/reports-api.service';
+import { ServiceHistoryApiService } from './api/service-history-api.service';
 import { SpacesApiService } from './api/spaces-api.service';
 import { StorageSyncService } from './storage-sync.service';
 
@@ -234,6 +235,7 @@ private hasCompletedInitialBackendSync = false;
     private clientsApi: ClientsApiService,
     private offlineSync: OfflineSyncService,
     private reportsApi: ReportsApiService,
+    private serviceHistoryApi: ServiceHistoryApiService,
     private spacesApi: SpacesApiService,
     private storageSync: StorageSyncService
   ) {
@@ -892,14 +894,15 @@ private toEpochAny(value: any): number | null {
 private isSameDailyReport(report: Report, periodKey: string): boolean {
   if (!report) return false;
 
-  // Compatibilidad con reportes nuevos
   if (report.periodType === 'MONTHLY') return false;
-  if (report.periodType === 'DAILY' && report.periodKey === periodKey) return true;
 
-  // Compatibilidad con legacy sin periodType/periodKey
+  if (report.periodKey) {
+    return report.periodType === 'DAILY' && report.periodKey === periodKey;
+  }
+
+  // Compatibilidad solo para reportes legacy que no tienen periodKey.
   const tsDay = (report.timestamp || '').slice(0, 10);
-  const looksDaily = !report.periodKey || report.periodKey.length === 10;
-  return looksDaily && tsDay === periodKey;
+  return tsDay === periodKey;
 }
 
 
@@ -1037,6 +1040,10 @@ getClientsByDateRange(from: string, to: string): Observable<Client[]> {
   return this.clientsApi.getByDateRange(from, to);
 }
 
+getServiceHistoryByDateRange(from: string, to: string): Observable<HistoricalService[]> {
+  return this.serviceHistoryApi.getByDateRange(from, to);
+}
+
 getUniqueClientsPageFromBackend(page: number = 0, size: number = 20, search: string = ''): Observable<PagedResponse<Client>> {
   return this.clientsApi.getUniqueClientsPage(page, size, search);
 }
@@ -1107,6 +1114,10 @@ deleteClientFromBackend(clientId: number): Observable<any> {
 
 updateClientInBackend(clientId: any, updatedData: any): Observable<Client> {
   return this.clientsApi.updateClient(clientId, updatedData);
+}
+
+updateClientVehiclesByDni(dni: string, vehicles: any[]): Observable<void> {
+  return this.clientsApi.updateVehiclesByDni(dni, vehicles);
 }
 
 getClientReservationsByDni(dni: string): Observable<Client[]> {

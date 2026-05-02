@@ -48,6 +48,28 @@ export interface Client {
   lastDayClosed?:any;
 }
 
+export interface HistoricalService {
+  id: number;
+  sourceClientId?: number;
+  code?: string;
+  name: string;
+  dni?: string;
+  phoneIntl?: string;
+  phoneRaw?: string;
+  plate?: string;
+  notes?: string;
+  spaceKey?: string;
+  vehicle?: string;
+  category?: string;
+  price?: number | null;
+  paymentMethod?: string;
+  clover?: number | null;
+  entryTimestamp?: number | null;
+  exitTimestamp?: number | null;
+  serviceDate?: string | null;
+  archivedBy?: string;
+}
+
 export interface QRData {
   t: string;
   client: {
