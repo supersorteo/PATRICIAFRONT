@@ -140,6 +140,7 @@ scheduledTimeServer = '';
 lastScheduledSnapshotDay = '';
 lastCloseDay = '';
 dailyCloseTime = '23:59';
+showCloseTestPanel = false;
 currentPageToday = 1;
 pageSizeToday = 5;
 dailyClients: Client[] = [];
@@ -164,6 +165,28 @@ paginatedDailyClientsList: Client[] = []; // Lista paginada real
 private statsRefreshIntervalId: any = null;
 private scheduleStatusPollId: any = null;
 private scheduleConfigRetryTimeoutId: any = null;
+private readonly reportsKeyboardShortcutHandler = (event: KeyboardEvent) => {
+  const key = (event.key || '').toLowerCase();
+
+  if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+
+  if (key === 'm') {
+    event.preventDefault();
+    this.showCloseTestPanel = true;
+    this.toastService.showInfo('Panel de cierre diario visible.');
+    this.cdr.markForCheck();
+    return;
+  }
+
+  if (key === 'o') {
+    event.preventDefault();
+    this.showCloseTestPanel = false;
+    this.toastService.showInfo('Panel de cierre diario oculto.');
+    this.cdr.markForCheck();
+  }
+};
 
   constructor(
     private autolavadoService: AutolavadoService,
@@ -177,6 +200,8 @@ private scheduleConfigRetryTimeoutId: any = null;
 
 
   ngOnInit(): void {
+    window.addEventListener('keydown', this.reportsKeyboardShortcutHandler);
+
     combineLatest([
       this.autolavadoService.subsuelos$,
       this.autolavadoService.spaces$,
@@ -252,6 +277,7 @@ this.loadPaymentColors();
 
 
   ngOnDestroy(): void {
+  window.removeEventListener('keydown', this.reportsKeyboardShortcutHandler);
   if (this.statsRefreshIntervalId) {
     clearInterval(this.statsRefreshIntervalId);
     this.statsRefreshIntervalId = null;
@@ -1758,8 +1784,16 @@ private shouldRefreshLiveStats(): boolean {
   return (this.dailyClients || []).some(client => this.toTimestamp(client?.entryTimestamp) !== null);
 }
 
+private withCurrentSpaceDisplayName(client: Client): Client {
+  const space = this.spaces[client.spaceKey || ''];
+  return {
+    ...client,
+    spaceDisplayName: space ? (space.displayName || space.key || client.spaceKey || '-') : (client.spaceKey || '-')
+  } as Client;
+}
+
 private applyDailyClientFiltersAndPagination(): void {
-  const source = this.dailyClients || [];
+  const source = (this.dailyClients || []).map(client => this.withCurrentSpaceDisplayName(client));
   const rawTerm = (this.searchTerm || '').toString().trim().toLowerCase();
 
   let filtered: Client[];

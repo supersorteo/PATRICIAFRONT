@@ -2167,36 +2167,8 @@ editSpace(oldKey: string, newKey: string, editedSpace: Space | null): void {
     throw new Error('No se puede editar un espacio reservado');
   }
 
-  // Validar unicidad solo si la clave cambió
-  if (newKey !== oldKey && spaces[newKey]) {
-    throw new Error('La nueva clave ya existe');
-  }
-
-  // === ACTUALIZAR EN LOCAL (tu lógica actual - perfecta) ===
-  // Actualizar clave (si cambió)
-  if (newKey !== oldKey) {
-    space.key = newKey;
-  }
-
-  // Actualizar campos editables
+  // El modal de edición de espacio solo permite cambiar el nombre visible.
   space.displayName = editedSpace.displayName || space.displayName;
-  space.subsueloId = editedSpace.subsueloId || space.subsueloId;
-
-  // Actualizar cliente si existe
-  if (space.client && editedSpace.client) {
-    space.client.name = editedSpace.client.name || space.client.name;
-    space.client.notes = editedSpace.client.notes || space.client.notes;
-    space.client.vehicle = editedSpace.client.vehicle || space.client.vehicle;
-    space.client.plate = editedSpace.client.plate || space.client.plate;
-    space.client.phoneIntl = editedSpace.client.phoneIntl || space.client.phoneIntl;
-    space.client.phoneRaw = editedSpace.client.phoneRaw || space.client.phoneRaw;
-  }
-
-  // Mover entrada si cambió la clave
-  if (newKey !== oldKey) {
-    delete spaces[oldKey];
-    spaces[newKey] = space;
-  }
 
   this.spacesSubject.next({ ...spaces });
   this.saveAll();

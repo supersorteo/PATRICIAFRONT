@@ -1244,25 +1244,28 @@
       <div class="modal-body" *ngIf="editedSpace">
         <div class="mb-3">
           <label class="form-label">Clave del Espacio</label>
-          <input type="text" class="form-control form-control-dark" [value]="editedSpace.key" readonly>
+          <input type="text" class="form-control form-control-dark" [value]="editedSpace.key" disabled>
         </div>
         <div class="mb-3">
           <label class="form-label">Nombre Visible</label>
           <input type="text" class="form-control form-control-dark" [(ngModel)]="editedSpace.displayName" placeholder="Ej: Parking VIP">
         </div>
-        <div class="mb-3" *ngIf="editedSpace.client">
+        <div class="small text-muted mb-3">
+          La clave del espacio es fija. Desde este modal solo se actualiza el nombre visible y el cambio se refleja al guardar.
+        </div>
+        <div class="mb-3 d-none" *ngIf="editedSpace.client">
           <label class="form-label">Nombre del Cliente</label>
           <input type="text" class="form-control form-control-dark" [(ngModel)]="editedSpace.client.name" placeholder="Nombre del cliente">
         </div>
-        <div class="mb-3" *ngIf="editedSpace.client">
+        <div class="mb-3 d-none" *ngIf="editedSpace.client">
           <label class="form-label">Teléfono</label>
           <input type="text" class="form-control form-control-dark" [(ngModel)]="editedSpace.client.phoneIntl" placeholder="+54 9 11 1234 5678">
         </div>
-        <div class="mb-3" *ngIf="editedSpace.client">
+        <div class="mb-3 d-none" *ngIf="editedSpace.client">
           <label class="form-label">Notas del Cliente</label>
           <textarea class="form-control form-control-dark" [(ngModel)]="editedSpace.client.notes" rows="2" placeholder="Notas del cliente"></textarea>
         </div>
-        <div class="row g-2 mb-3" *ngIf="editedSpace.client">
+        <div class="row g-2 mb-3 d-none" *ngIf="editedSpace.client">
           <div class="col-6">
             <label class="form-label">Vehículo</label>
             <input type="text" class="form-control form-control-dark" [(ngModel)]="editedSpace.client.vehicle" placeholder="Ej: Toyota Corolla">

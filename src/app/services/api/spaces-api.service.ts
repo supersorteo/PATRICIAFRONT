@@ -37,7 +37,17 @@ export class SpacesApiService {
   }
 
   updateSpace(space: Space): Observable<Space> {
-    return this.http.put<Space>(`${this.apiBase}/spaces/${space.key}`, space);
+    const payload = {
+      key: space.key,
+      subsueloId: space.subsueloId,
+      occupied: !!space.occupied,
+      hold: !!space.hold,
+      clientId: space.clientId ?? null,
+      startTime: space.startTime ?? null,
+      displayName: space.displayName ?? null
+    };
+
+    return this.http.put<Space>(`${this.apiBase}/spaces/${space.key}`, payload);
   }
 
   updateSubsuelo(subsuelo: Subsuelo): Observable<Subsuelo> {

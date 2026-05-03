@@ -4288,7 +4288,7 @@ editSpace(space: Space): void {
     ...space,
     client: space.client ? { ...space.client } : null // Copia completa del espacio y cliente
   };
-  this.newSpaceKey = space.key; // Prellenar clave (no editable)
+  this.newSpaceKey = space.key;
 
   this.showModal('editSpaceModal');
   console.log('Datos del espacio antes de editar:', this.editedSpace); // Logging para depurar
@@ -4307,14 +4307,7 @@ private async confirmEditSpaceWithConfirm(): Promise<void> {
     return;
   }
 
-  if (this.newSpaceKey !== this.selectedSpaceKey) {
-    const pattern = /^SUB\d+-[A-Za-z0-9]+$/;
-    if (!pattern.test(this.newSpaceKey)) {
-      console.log('Patron invalido');
-      this.toastService.showWarning('La clave debe seguir el patron SUBN-XXX donde XXX son letras o numeros.');
-      return;
-    }
-  }
+  this.newSpaceKey = this.selectedSpaceKey;
 
   const confirmed = await this.confirmService.confirm({
     title: 'Guardar cambios del espacio',
@@ -4330,7 +4323,7 @@ private async confirmEditSpaceWithConfirm(): Promise<void> {
 
   try {
     console.log('Llamando al servicio editSpace');
-    this.autolavadoService.editSpace(this.selectedSpaceKey, this.newSpaceKey, this.editedSpace);
+    this.autolavadoService.editSpace(this.selectedSpaceKey, this.selectedSpaceKey, this.editedSpace);
     console.log('Servicio exitoso, actualizando vista');
     this.filterSpaces();
     this.cdr.detectChanges();

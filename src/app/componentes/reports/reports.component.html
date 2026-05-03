@@ -4,24 +4,53 @@
       </div>
     </div>
 
-    <div class="reports-close-test-float shadow-lg">
+    <div class="reports-close-test-float" *ngIf="showCloseTestPanel">
+      <div class="reports-close-test-float__glow"></div>
       <div class="reports-close-test-float__title">
-        <i class="bi bi-clock-history me-2"></i>Prueba cierre automatico
+        <div class="reports-close-test-float__title-main">
+          <span class="reports-close-test-float__icon">
+            <i class="bi bi-clock-history"></i>
+          </span>
+          <div>
+            <div class="reports-close-test-float__eyebrow">Modo pruebas</div>
+            <div class="reports-close-test-float__heading">Cierre diario automatico</div>
+          </div>
+        </div>
+        <button
+          class="reports-close-test-float__dismiss"
+          type="button"
+          title="Ocultar panel (Ctrl+O)"
+          (click)="showCloseTestPanel = false">
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
+
       <div class="reports-close-test-float__body">
-        <label class="form-label mb-2">Hora de cierre del dia</label>
-        <div class="input-group">
+        <div class="reports-close-test-float__meta">
+          <span class="reports-close-test-float__chip">
+            <i class="bi bi-globe2"></i> {{ reportBusinessTimeZone }}
+          </span>
+          <span class="reports-close-test-float__chip reports-close-test-float__chip--accent">
+            <i class="bi bi-moon-stars"></i> {{ dailyCloseTime || '23:59' }}
+          </span>
+        </div>
+
+        <label class="reports-close-test-float__label">Hora de cierre del dia</label>
+
+        <div class="reports-close-test-float__controls">
           <input
             type="time"
-            class="form-control"
+            class="form-control reports-close-test-float__input"
             [(ngModel)]="dailyCloseTime"
             (change)="saveDailyCloseTime()">
-          <button class="btn btn-warning" type="button" (click)="saveDailyCloseTime()">
-            Aplicar
+          <button class="btn reports-close-test-float__apply" type="button" (click)="saveDailyCloseTime()">
+            <i class="bi bi-check2-circle me-1"></i>Aplicar
           </button>
         </div>
-        <div class="small text-muted mt-2">
-          Zona operativa actual: <span class="text-light">{{ reportBusinessTimeZone }}</span>
+
+        <div class="reports-close-test-float__hint">
+          <span><kbd>Ctrl+M</kbd> mostrar</span>
+          <span><kbd>Ctrl+O</kbd> ocultar</span>
         </div>
       </div>
     </div>
