@@ -44,7 +44,8 @@ export class SpacesApiService {
       hold: !!space.hold,
       clientId: space.clientId ?? null,
       startTime: space.startTime ?? null,
-      displayName: space.displayName ?? null
+      displayName: space.displayName ?? null,
+      whatsappSent: !!space.whatsappSent
     };
 
     return this.http.put<Space>(`${this.apiBase}/spaces/${space.key}`, payload);

@@ -15,6 +15,7 @@ export interface Space {
   client?: Client | null;
   startTime: any | null;
   displayName?: string;
+  whatsappSent?: boolean;
 }
 
 export interface ClientVehicle {

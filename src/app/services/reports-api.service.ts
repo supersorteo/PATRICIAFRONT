@@ -40,6 +40,10 @@ export class ReportsApiService {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
 
+  deleteMethod1(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}/method1`);
+  }
+
   manualDayClose(day?: string): Observable<void> {
     let params = new HttpParams();
     if (day) params = params.set('day', day);

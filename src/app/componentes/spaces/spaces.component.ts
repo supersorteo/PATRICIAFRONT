@@ -3862,6 +3862,9 @@ launchWhatsApp(): void {
   if (this.whatsappLink) {
     this.qrService.downloadQR('qrcode', `${this.qrCaption}.png`);
     window.open(this.whatsappLink, '_blank');
+    if (this.selectedSpaceKey) {
+      this.autolavadoService.markSpaceWhatsappSent(this.selectedSpaceKey, true);
+    }
     // this.closeWhatsAppModalOccupied();
 
     //this.hasCopiedMessageOccupied = false
@@ -4475,7 +4478,7 @@ copyMessageOccupied01(): void {
 
 isReleaseMessageSentForSpace(space: Space): boolean {
   if (!space?.key) return false;
-  return this.sentReleaseWhatsappBySpace.has(space.key);
+  return !!space.whatsappSent;
 }
 
 

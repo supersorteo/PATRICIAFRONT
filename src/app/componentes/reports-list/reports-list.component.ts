@@ -133,6 +133,10 @@ export class ReportsListComponent implements OnInit{
     void this.deleteReportWithConfirm(id);
   }
 
+  deleteReportMethod1(id: number): void {
+    void this.deleteReportMethod1WithConfirm(id);
+  }
+
   private async deleteReportWithConfirm(id: number): Promise<void> {
     const confirmed = await this.confirmService.confirm({
       title: 'Eliminar reporte',
@@ -154,6 +158,34 @@ export class ReportsListComponent implements OnInit{
       error: (error) => {
         console.error('Error deleting report', error);
         const msg = error?.error?.error ?? 'Error al eliminar el reporte.';
+        this.toastService.showError(msg);
+      }
+    });
+  }
+
+  private async deleteReportMethod1WithConfirm(id: number): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Eliminar reporte de prueba',
+      message:
+        `Eliminar reporte ID ${id} usando method1?\n\n` +
+        `Este metodo es solo para pruebas: si el reporte es un cierre diario final, tambien puede eliminar el mensual dependiente para permitir volver a probar el cierre.`,
+      confirmText: 'Eliminar con method1',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.reportsApi.deleteMethod1(id).subscribe({
+      next: () => {
+        this.loadReports();
+        this.toastService.showSuccess('Reporte eliminado con method1.');
+      },
+      error: (error) => {
+        console.error('Error deleting report with method1', error);
+        const msg = error?.error?.error ?? 'Error al eliminar el reporte con method1.';
         this.toastService.showError(msg);
       }
     });

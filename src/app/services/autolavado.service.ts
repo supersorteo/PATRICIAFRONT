@@ -27,6 +27,7 @@ export interface Space {
   client?: Client | null;
   startTime: number | null;
   displayName?: string;
+  whatsappSent?: boolean;
 }
 
  export interface Client {
@@ -999,6 +1000,32 @@ updateSpaceInBackend(space: Space): Observable<Space> {
   return this.spacesApi.updateSpace(space);
 }
 
+markSpaceWhatsappSent(spaceKey: string, sent: boolean): void {
+  const spaces = this.spacesSubject.value;
+  const space = spaces[spaceKey];
+  if (!space) {
+    return;
+  }
+
+  space.whatsappSent = sent;
+  this.spacesSubject.next({ ...spaces });
+  this.saveAll();
+
+  this.updateSpaceInBackend(space).subscribe({
+    next: () => {
+      console.log('Estado WhatsApp del espacio sincronizado:', spaceKey, sent);
+    },
+    error: (err) => {
+      if (!this.offlineSync.isOfflineError(err)) {
+        console.warn('Error actualizando estado WhatsApp del espacio en backend', spaceKey, err);
+        return;
+      }
+
+      this.offlineSync.enqueue('updateSpace', { space: { ...space } });
+    }
+  });
+}
+
 releaseSpaceInBackend(spaceKey: string): Observable<void> {
   return this.clientsApi.releaseSpace(spaceKey);
 }
@@ -1528,6 +1555,7 @@ saveClient(clientData: any, spaceKey: string): Client {
     clientId: tempId,
     startTime: Date.now(),
     hold: false,
+    whatsappSent: false,
     client: client
   };
 
@@ -1695,6 +1723,7 @@ releaseSpace(spaceKey: string): Observable<any> {
   space.clientId = null;
   space.startTime = null;
   space.hold = false;
+  space.whatsappSent = false;
   space.client = null;
 
   this.spacesSubject.next({ ...spaces });

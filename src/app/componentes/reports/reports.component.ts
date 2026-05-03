@@ -1556,7 +1556,7 @@ private persistScheduleConfig(mode: 'snapshot' | 'close'): void {
     businessTimeZone: null,
     dailyCloseTime: normalizedCloseTime || '23:59',
     lastSnapshotDay: mode === 'snapshot' ? null : (this.lastScheduledSnapshotDay || null),
-    lastCloseDay: this.lastCloseDay || null
+    lastCloseDay: mode === 'close' ? null : (this.lastCloseDay || null)
   };
 
   console.log('%c[REPORT-SCHEDULE][FRONT] Guardando configuracion', 'color:#38bdf8;font-weight:bold;', {

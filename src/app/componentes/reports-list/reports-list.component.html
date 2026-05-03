@@ -86,6 +86,12 @@
                   <td>
                     <button class="btn btn-sm btn-outline-primary me-1" (click)="viewReport(row.id)">Ver</button>
                     <button class="btn btn-sm btn-outline-danger" (click)="deleteReport(row.id)">Eliminar</button>
+                    <button
+                      *ngIf="row.raw.reportType === 'DAY_CLOSE'"
+                      class="btn btn-sm btn-warning ms-1"
+                      (click)="deleteReportMethod1(row.id)">
+                      Method1
+                    </button>
                   </td>
                 </tr>
               </tbody>
