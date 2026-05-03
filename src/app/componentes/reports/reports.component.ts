@@ -1630,6 +1630,7 @@ private scheduleRetryLoadReportScheduleConfig(): void {
 private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, source: 'init' | 'poll' | 'save'): void {
   const previousTime = this.scheduledTime || '';
   const previousLastDay = this.lastScheduledSnapshotDay || '';
+  const previousCloseDay = this.lastCloseDay || '';
 
   this.reportBusinessTimeZone = (config?.businessTimeZone || this.browserTimeZone).trim() || this.browserTimeZone;
   this.dailyCloseTime = (config?.dailyCloseTime || '23:59').trim() || '23:59';
@@ -1637,6 +1638,20 @@ private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, sou
   this.scheduledTime = this.serverTimeToLocalTime(this.scheduledTimeServer) || '';
   this.lastScheduledSnapshotDay = config?.lastSnapshotDay || '';
   this.lastCloseDay = config?.lastCloseDay || '';
+
+  if (source === 'poll' && this.lastCloseDay && this.lastCloseDay !== previousCloseDay) {
+    console.log('%c[DAY-CLOSE][FRONT] Cierre del dia detectado. Recargando datos...', 'color:#22c55e;font-weight:bold;', {
+      previousCloseDay: previousCloseDay || null,
+      newCloseDay: this.lastCloseDay
+    });
+    this.autolavadoService.loadAllFromBackend();
+    if (this.showStatsPanel) {
+      if (this.statsAutoRefreshTimer) clearTimeout(this.statsAutoRefreshTimer);
+      this.statsAutoRefreshTimer = setTimeout(() => this.loadStats(), 1500);
+    }
+    this.toastService.showInfo('Cierre del día completado. Actualizando datos...');
+    this.cdr.markForCheck();
+  }
 
   console.log('[REPORT-SCHEDULE][FRONT]', {
     source,
