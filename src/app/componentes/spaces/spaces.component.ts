@@ -951,22 +951,11 @@ selectVehicle(v: VehicleType) {
       price: v.price
     });
 
-    // Opcional útil: si ya está abierto/gestionando vehículos del cliente, sincronizar buffer local
-    try {
-      const plate = (this.clientForm.get('plate')?.value || '').toString().trim();
-      const notes = (this.clientForm.get('notes')?.value || '').toString().trim();
-
-      // Solo actualiza el buffer local del modal/lista de trabajo
-      if (Array.isArray(this.clientVehiclesList)) {
-        this.upsertClientVehicleInList({
-          model: v.model,
-          plate,
-          notes
-        });
-      }
-    } catch (e: any) {
-      console.warn('[selectVehicle] No se pudo sincronizar buffer de vehículos:', e?.message || e);
-    }
+    const existingVehicle = this.findClientVehicleByModel(v.model);
+    this.clientForm.patchValue({
+      plate: existingVehicle?.plate || '',
+      notes: existingVehicle?.notes || ''
+    });
   }
 
   this.closeVehicleAside();
@@ -1567,6 +1556,17 @@ private normalizeVehicleModel(model: string | null | undefined): string {
   return (model || '').toString().trim().toLowerCase();
 }
 
+private findClientVehicleByModel(model: string | null | undefined): ClientVehicleItem | undefined {
+  const modelNorm = this.normalizeVehicleModel(model);
+  if (!modelNorm) {
+    return undefined;
+  }
+
+  return (this.clientVehiclesList || []).find(v =>
+    this.normalizeVehicleModel(v?.model) === modelNorm
+  );
+}
+
 
 
 
@@ -1597,12 +1597,18 @@ private upsertClientVehicleInList(item: ClientVehicleItem): void {
     return;
   }
 
-  // If the same model already exists (any plate/notes), skip to prevent duplicates.
-  // Plate/notes updates must be done explicitly via Edit in the vehicles modal.
+  // Si el modelo ya existe, se actualizan solo sus propios datos.
+  // Esto evita que una entrada creada como placeholder conserve matrícula/notas viejas.
   const sameModelIdx = this.clientVehiclesList.findIndex(v =>
     this.normalizeVehicleModel(v.model) === modelNorm
   );
   if (sameModelIdx >= 0) {
+    const existing = this.clientVehiclesList[sameModelIdx];
+    this.clientVehiclesList[sameModelIdx] = {
+      model: existing.model || incoming.model,
+      plate: incoming.plate || existing.plate || '',
+      notes: incoming.notes || existing.notes || ''
+    };
     return;
   }
 

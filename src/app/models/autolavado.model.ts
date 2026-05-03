@@ -90,17 +90,17 @@ export interface Report {
   timestamp: string;
   periodType?: 'DAILY' | 'MONTHLY';
   periodKey?: string;
+  reportType?: 'MANUAL' | 'SCHEDULED' | 'DAY_CLOSE' | 'MONTHLY';
   totalSpaces: number;
   occupiedSpaces: number;
   freeSpaces: number;
   occupancyRate: number;
-  subsueloStats: string; // JSON string
-  timeStats: string; // JSON string
-  filteredClients: string; // JSON string
-  paymentAmounts?: string;     // Opcional
+  subsueloStats: string;
+  timeStats: string;
+  filteredClients: string;
+  paymentAmounts?: string;
   totalCobrado?: number;
   dailyFinal?: boolean;
-
 }
 
 

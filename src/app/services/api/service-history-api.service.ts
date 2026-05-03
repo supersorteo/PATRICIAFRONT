@@ -17,4 +17,8 @@ export class ServiceHistoryApiService {
       params: { from, to }
     });
   }
+
+  resetAll(): Observable<void> {
+    return this.http.post<void>(`${this.apiBase}/service-history/reset`, {});
+  }
 }

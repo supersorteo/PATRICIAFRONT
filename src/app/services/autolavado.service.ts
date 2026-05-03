@@ -1111,6 +1111,40 @@ deleteClientFromBackend(clientId: number): Observable<any> {
   );
 }
 
+deleteServiceFromBackend(clientId: number): Observable<any> {
+  console.log('Eliminando servicio ID:', clientId, 'del backend');
+  const targetClient = this.clientsSubject.value[clientId.toString()];
+
+  return this.clientsApi.deleteService(clientId).pipe(
+    tap(() => {
+      if (!targetClient) {
+        return;
+      }
+
+      const nextClients = { ...this.clientsSubject.value };
+      delete nextClients[clientId.toString()];
+
+      const nextSpaces = { ...this.spacesSubject.value };
+      Object.values(nextSpaces).forEach(space => {
+        const currentClientId = space.clientId?.toString?.() ?? '';
+        if (currentClientId === clientId.toString()) {
+          space.occupied = false;
+          space.hold = false;
+          space.clientId = null;
+          space.startTime = null;
+          space.client = null;
+        }
+      });
+
+      this.clientsSubject.next(nextClients);
+      this.spacesSubject.next(nextSpaces);
+      this.saveAll();
+
+      console.log('Estado local actualizado: servicio eliminado sin afectar otros servicios del cliente');
+    })
+  );
+}
+
 
 updateClientInBackend(clientId: any, updatedData: any): Observable<Client> {
   return this.clientsApi.updateClient(clientId, updatedData);

@@ -11,11 +11,55 @@
 .card-title{
   color: white;
 }
-    .stats-card {
-      min-height: 100px;
-      display: flex;
-      align-items: center;
-    }
+.stats-card {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+}
+
+.reports-close-test-float {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1040;
+  width: min(320px, calc(100vw - 2rem));
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96));
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.45);
+  overflow: hidden;
+}
+
+.reports-close-test-float__title {
+  padding: 0.8rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fbbf24;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.reports-close-test-float__body {
+  padding: 0.95rem 1rem 1rem;
+}
+
+.reports-close-test-float .form-control {
+  min-height: 42px;
+}
+
+@media (max-width: 767.98px) {
+  .reports-close-test-float {
+    top: auto;
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+  }
+}
     .stats-number {
       font-size: 2rem;
       font-weight: bold;

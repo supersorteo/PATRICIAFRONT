@@ -8,7 +8,10 @@ import { PagedResponse } from './autolavado.service';
 export interface ReportScheduleConfig {
   enabled: boolean;
   dailySnapshotTime: string | null;
+  businessTimeZone: string | null;
+  dailyCloseTime: string | null;
   lastSnapshotDay: string | null;
+  lastCloseDay: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,6 +38,12 @@ export class ReportsApiService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  manualDayClose(day?: string): Observable<void> {
+    let params = new HttpParams();
+    if (day) params = params.set('day', day);
+    return this.http.post<void>(`${this.base}/daily/finalize-and-close`, {}, { params });
   }
 
   generateMonthly(month: string): Observable<Report> {

@@ -4,6 +4,28 @@
       </div>
     </div>
 
+    <div class="reports-close-test-float shadow-lg">
+      <div class="reports-close-test-float__title">
+        <i class="bi bi-clock-history me-2"></i>Prueba cierre automatico
+      </div>
+      <div class="reports-close-test-float__body">
+        <label class="form-label mb-2">Hora de cierre del dia</label>
+        <div class="input-group">
+          <input
+            type="time"
+            class="form-control"
+            [(ngModel)]="dailyCloseTime"
+            (change)="saveDailyCloseTime()">
+          <button class="btn btn-warning" type="button" (click)="saveDailyCloseTime()">
+            Aplicar
+          </button>
+        </div>
+        <div class="small text-muted mt-2">
+          Zona operativa actual: <span class="text-light">{{ reportBusinessTimeZone }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Estadisticas Generales -->
     <div class="row g-3 mb-4">
 
@@ -467,6 +489,13 @@
           <div *ngIf="lastScheduledSnapshotDay" class="small text-muted mt-1">
             Ultimo snapshot automatico ejecutado: {{ lastScheduledSnapshotDay }}
           </div>
+          <div class="small text-muted mt-1">
+            Zona operativa: <span class="text-light">{{ reportBusinessTimeZone }}</span>
+            · Cierre diario: <span class="text-light">{{ dailyCloseTime || '23:59' }}</span>
+          </div>
+          <div class="small text-muted">
+            El cierre automatico y los reportes programados usan la zona horaria del equipo donde corre el backend. Si el equipo cambia de zona, la app se adapta.
+          </div>
         </div>
       </div>
     </div>
@@ -578,7 +607,12 @@
         <i class="bi bi-bar-chart-line text-warning fs-4"></i>
         <h5 class="mb-0 fw-bold">Estadisticas de Servicios</h5>
       </div>
-      <button class="btn-close btn-close-white" type="button" (click)="closeStatsPanel()"></button>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-danger btn-sm" type="button" (click)="resetStatsHistory()">
+          Reset historico
+        </button>
+        <button class="btn-close btn-close-white" type="button" (click)="closeStatsPanel()"></button>
+      </div>
     </div>
 
     <div class="stats-modal__body">

@@ -105,6 +105,10 @@ export class ClientsApiService {
     return this.http.delete<void>(`${this.apiBase}/clients/${clientId}`);
   }
 
+  deleteService(clientId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiBase}/clients/${clientId}/service`);
+  }
+
   updateClient(clientId: any, updatedData: any): Observable<Client> {
     return this.http.put<Client>(`${this.apiBase}/clients/${clientId}`, updatedData);
   }

@@ -9,6 +9,7 @@ import { FormatPhonePipe } from "../../services/format-phone.pipe";
 import { ReportScheduleConfig, ReportsApiService } from '../../services/reports-api.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
+import { ServiceHistoryApiService } from '../../services/api/service-history-api.service';
 
 declare const bootstrap: any;
 
@@ -44,7 +45,8 @@ interface StatsMonthOption {
 })
 export class ReportsComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  private readonly reportServerTimeZone = 'America/Argentina/Buenos_Aires';
+  private readonly browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  reportBusinessTimeZone = this.browserTimeZone;
 
   subsuelos: Subsuelo[] = [];
   spaces: { [key: string]: Space } = {};
@@ -104,6 +106,7 @@ pageSizeDaily = 5;
   isLoadingRanking = false;
 
   showStatsPanel = false;
+  private statsAutoRefreshTimer: any = null;
   statsDateInput = '';
   statsMonthInput = '';
   statsMode: 'month' | 'day' | 'week' = 'month';
@@ -135,6 +138,8 @@ rankingList: RankingClienteView[] = [];
 scheduledTime: string = ''; // Hora programada en servidor (HH:mm)
 scheduledTimeServer = '';
 lastScheduledSnapshotDay = '';
+lastCloseDay = '';
+dailyCloseTime = '23:59';
 currentPageToday = 1;
 pageSizeToday = 5;
 dailyClients: Client[] = [];
@@ -164,6 +169,7 @@ private scheduleConfigRetryTimeoutId: any = null;
     private autolavadoService: AutolavadoService,
     private cdr: ChangeDetectorRef,
     private reportsApi: ReportsApiService,
+    private serviceHistoryApi: ServiceHistoryApiService,
     private toastService: ToastService,
     private confirmService: ConfirmService,
     private ngZone: NgZone
@@ -198,6 +204,11 @@ private scheduleConfigRetryTimeoutId: any = null;
 
       this.calculateStats();
       this.cdr.markForCheck();
+
+      if (this.showStatsPanel) {
+        if (this.statsAutoRefreshTimer) clearTimeout(this.statsAutoRefreshTimer);
+        this.statsAutoRefreshTimer = setTimeout(() => this.loadStats(), 800);
+      }
     });
 
     this.ngZone.runOutsideAngular(() => {
@@ -252,6 +263,10 @@ this.loadPaymentColors();
   if (this.scheduleConfigRetryTimeoutId) {
     clearTimeout(this.scheduleConfigRetryTimeoutId);
     this.scheduleConfigRetryTimeoutId = null;
+  }
+  if (this.statsAutoRefreshTimer) {
+    clearTimeout(this.statsAutoRefreshTimer);
+    this.statsAutoRefreshTimer = null;
   }
 
   this.destroy$.next();
@@ -445,8 +460,9 @@ private buildRankingFromBackendData(clients: Client[], counts: Record<string, nu
 toggleStatsPanel(): void {
   this.showStatsPanel = !this.showStatsPanel;
   if (this.showStatsPanel) {
-    if (!this.statsDateInput) {
-      this.statsDateInput = this.formatDateInputValue(new Date());
+    const todayArgentina = this.formatDateInputValue(new Date());
+    if (!this.statsDateInput || this.statsDateInput > todayArgentina) {
+      this.statsDateInput = todayArgentina;
     }
     if (!this.statsMonthInput) {
       this.statsMonthInput = this.formatMonthInputValue(new Date());
@@ -459,6 +475,37 @@ toggleStatsPanel(): void {
 
 closeStatsPanel(): void {
   this.showStatsPanel = false;
+}
+
+resetStatsHistory(): void {
+  void this.resetStatsHistoryWithConfirm();
+}
+
+private async resetStatsHistoryWithConfirm(): Promise<void> {
+  const confirmed = await this.confirmService.confirm({
+    title: 'Reset del historico',
+    message: 'Esto eliminara todos los registros de service_history. Las estadisticas quedaran vacias hasta que se generen nuevos cierres y nuevos servicios archivados. Esta accion no se puede deshacer.',
+    confirmText: 'Resetear historico',
+    cancelText: 'Cancelar',
+    variant: 'danger'
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  this.serviceHistoryApi.resetAll().pipe(takeUntil(this.destroy$)).subscribe({
+    next: () => {
+      this.statsClients = [];
+      this.statsCurrentPage = 1;
+      this.showSuccessToast('Historico reseteado correctamente.');
+      this.loadStats();
+    },
+    error: (error) => {
+      console.error('Error reseteando historico de servicios', error);
+      this.showErrorToast('No se pudo resetear el historico de servicios.');
+    }
+  });
 }
 
 setStatsMode(mode: 'month' | 'week' | 'day'): void {
@@ -536,6 +583,8 @@ private fetchStatsByRange(from: string, to: string): void {
   this.autolavadoService.getServiceHistoryByDateRange(from, to).pipe(
     map(historyServices => this.mergeStatsServices(
       (historyServices || []).filter(service =>
+        service.serviceDate != null &&
+        service.serviceDate <= today &&
         !(service.serviceDate === today && service.archivedBy === 'REPORT_BACKFILL')
       ),
       this.rangeIncludesToday(from, to) ? this.buildLiveStatsServices(from, to) : []
@@ -594,7 +643,7 @@ private buildLiveStatsServices(from: string, to: string): HistoricalService[] {
       clover: client.clover ?? null,
       entryTimestamp: this.toTimestamp(client.entryTimestamp),
       exitTimestamp: this.toTimestamp(client.exitTimestamp),
-      serviceDate: from,
+      serviceDate: this.formatDateInputValue(new Date()),
       archivedBy: 'LIVE'
     }));
 }
@@ -742,7 +791,9 @@ get statsDayMinDate(): string {
 get statsDayMaxDate(): string {
   const monthBase = this.parseMonthInput(this.statsMonthInput);
   if (!monthBase) return '';
-  return this.getMonthRange(monthBase).to;
+  const monthEnd = this.getMonthRange(monthBase).to;
+  const todayArgentina = this.formatDateInputValue(new Date());
+  return monthEnd < todayArgentina ? monthEnd : todayArgentina;
 }
 
 private getWeekRange(baseDate: Date, includeDates = false): { from: string; to: string; fromDate?: Date; toDate?: Date } {
@@ -806,9 +857,11 @@ private ensureStatsDateInsideSelectedMonth(): void {
   if (!monthBase) return;
 
   const { from, to } = this.getMonthRange(monthBase);
-  if (!this.statsDateInput || this.statsDateInput < from || this.statsDateInput > to) {
-    const today = this.formatDateInputValue(new Date());
-    this.statsDateInput = today >= from && today <= to ? today : from;
+  const today = this.formatDateInputValue(new Date());
+  const maxDate = to < today ? to : today;
+
+  if (!this.statsDateInput || this.statsDateInput < from || this.statsDateInput > maxDate) {
+    this.statsDateInput = today >= from && today <= maxDate ? today : from;
   }
 }
 
@@ -870,11 +923,16 @@ private getMonthRange(baseDate: Date): { from: string; to: string } {
 }
 
 private formatDateInputValue(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 private formatMonthInputValue(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  return `${y}-${String(m).padStart(2, '0')}`;
 }
 
 private parseMonthInput(monthValue: string): Date | null {
@@ -1455,33 +1513,54 @@ getElapsedTimeForClient(client: Client): string {
 
 
 saveScheduledTime(): void {
+  this.persistScheduleConfig('snapshot');
+}
+
+saveDailyCloseTime(): void {
+  this.persistScheduleConfig('close');
+}
+
+private persistScheduleConfig(mode: 'snapshot' | 'close'): void {
   const normalizedTime = (this.scheduledTime || '').trim();
   const normalizedServerTime = this.localTimeToServerTime(normalizedTime);
+  const normalizedCloseTime = (this.dailyCloseTime || '').trim();
   const payload: ReportScheduleConfig = {
     enabled: !!normalizedServerTime,
     dailySnapshotTime: normalizedServerTime || null,
-    lastSnapshotDay: null
+    businessTimeZone: null,
+    dailyCloseTime: normalizedCloseTime || '23:59',
+    lastSnapshotDay: mode === 'snapshot' ? null : (this.lastScheduledSnapshotDay || null),
+    lastCloseDay: this.lastCloseDay || null
   };
 
-  console.log('%c[REPORT-SCHEDULE][FRONT] Guardando programacion', 'color:#38bdf8;font-weight:bold;', {
+  console.log('%c[REPORT-SCHEDULE][FRONT] Guardando configuracion', 'color:#38bdf8;font-weight:bold;', {
+    mode,
     localTimeSelected: normalizedTime || null,
     serverTimeSent: normalizedServerTime || null,
-    serverZone: this.reportServerTimeZone,
+    serverZone: this.reportBusinessTimeZone,
+    businessTimeZoneSent: payload.businessTimeZone,
+    dailyCloseTimeSent: payload.dailyCloseTime,
     browserTime: new Date().toISOString()
   });
 
   this.reportsApi.updateScheduleConfig(payload).pipe(takeUntil(this.destroy$)).subscribe({
     next: (config) => {
       this.applyScheduleConfig(config, 'save');
-      if (config.enabled && config.dailySnapshotTime) {
+      if (mode === 'close') {
+        this.showSuccessToast(`Hora de cierre diario actualizada a las ${this.dailyCloseTime || '23:59'}.`);
+      } else if (config.enabled && config.dailySnapshotTime) {
         this.showSuccessToast(`Reporte automatico programado para las ${this.scheduledTime} de tu hora local.`);
       } else {
         this.showWarningToast('Programacion automatica desactivada.');
       }
     },
     error: (error) => {
-      console.error('Error guardando configuracion de reporte automatico', error);
-      this.showErrorToast('No se pudo guardar la programacion automatica en el servidor.');
+      console.error('Error guardando configuracion de reportes', error);
+      this.showErrorToast(
+        mode === 'close'
+          ? 'No se pudo guardar la hora de cierre diario en el servidor.'
+          : 'No se pudo guardar la programacion automatica en el servidor.'
+      );
     }
   });
 }
@@ -1526,17 +1605,22 @@ private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, sou
   const previousTime = this.scheduledTime || '';
   const previousLastDay = this.lastScheduledSnapshotDay || '';
 
+  this.reportBusinessTimeZone = (config?.businessTimeZone || this.browserTimeZone).trim() || this.browserTimeZone;
+  this.dailyCloseTime = (config?.dailyCloseTime || '23:59').trim() || '23:59';
   this.scheduledTimeServer = config?.dailySnapshotTime || '';
   this.scheduledTime = this.serverTimeToLocalTime(this.scheduledTimeServer) || '';
   this.lastScheduledSnapshotDay = config?.lastSnapshotDay || '';
+  this.lastCloseDay = config?.lastCloseDay || '';
 
   console.log('[REPORT-SCHEDULE][FRONT]', {
     source,
     enabled: !!config?.enabled,
     scheduledTimeLocal: this.scheduledTime || null,
     scheduledTimeServer: this.scheduledTimeServer || null,
-    serverZone: this.reportServerTimeZone,
+    serverZone: this.reportBusinessTimeZone,
+    dailyCloseTime: this.dailyCloseTime || null,
     lastSnapshotDay: this.lastScheduledSnapshotDay || null,
+    lastCloseDay: this.lastCloseDay || null,
     browserTime: new Date().toISOString()
   });
 
@@ -1598,7 +1682,7 @@ private localTimeToServerTime(localTime: string | null | undefined): string | nu
   localCandidate.setHours(hour, minute, 0, 0);
 
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: this.reportServerTimeZone,
+    timeZone: this.reportBusinessTimeZone,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
@@ -1613,9 +1697,9 @@ private serverTimeToLocalTime(serverTime: string | null | undefined): string | n
 
   const [hour, minute] = value.split(':').map(Number);
   const now = new Date();
-  const serverDateParts = this.getDatePartsForTimeZone(now, this.reportServerTimeZone);
+  const serverDateParts = this.getDatePartsForTimeZone(now, this.reportBusinessTimeZone);
   const utcGuess = Date.UTC(serverDateParts.year, serverDateParts.month - 1, serverDateParts.day, hour, minute, 0, 0);
-  const serverOffset = this.getTimeZoneOffsetMinutes(new Date(utcGuess), this.reportServerTimeZone);
+  const serverOffset = this.getTimeZoneOffsetMinutes(new Date(utcGuess), this.reportBusinessTimeZone);
   const instant = new Date(utcGuess - serverOffset * 60000);
 
   return `${String(instant.getHours()).padStart(2, '0')}:${String(instant.getMinutes()).padStart(2, '0')}`;
@@ -1773,13 +1857,11 @@ private executeGenerateAndSaveReport(isManual: boolean = false): void {
   this.reportsApi.getAll().pipe(
     map((reports) => (reports || []).filter(r => this.isSameDailyReportByPeriodKey(r, periodKey))),
     switchMap((existingDailyReports) => {
-      const existingClients = existingDailyReports.flatMap(r => this.parseJsonArraySafe(r.filteredClients));
-      const mergedClients = this.mergeAndDedupDailyReportClients(existingClients, enrichedClients);
+      const mergedClients = enrichedClients;
 
       console.log('[DIARIO] merge resultado', {
         periodKey,
         existingReports: existingDailyReports.length,
-        existingClients: existingClients.length,
         currentClients: enrichedClients.length,
         mergedClients: mergedClients.length,
         existingReportIds: existingDailyReports.map(r => r.id)
@@ -1794,22 +1876,11 @@ private executeGenerateAndSaveReport(isManual: boolean = false): void {
       // Construir payload consolidado del dÃ­a (pero NO final)
       const reportData: any = this.buildDailyReportPayloadMerged(mergedClients, periodKey);
       reportData.dailyFinal = false; // âœ… manual/auto intermedio
+      reportData.reportType = 'MANUAL';
 
       console.log('[DIARIO] payload consolidado (dailyFinal=false):', reportData);
 
-      // Borrar diarios previos del mismo dÃ­a y recrear consolidado Ãºnico
-      const deleteCalls = existingDailyReports.map(r =>
-        this.reportsApi.delete(r.id).pipe(
-          catchError((err) => {
-            console.warn('[DIARIO] Error borrando reporte diario previo', { reportId: r.id, err });
-            // No aborta; seguimos para no bloquear operaciÃ³n del usuario
-            return of(void 0);
-          })
-        )
-      );
-
-      return (deleteCalls.length ? forkJoin(deleteCalls) : of([])).pipe(
-        switchMap(() => this.reportsApi.create(reportData)),
+      return this.reportsApi.create(reportData).pipe(
         map((savedReport) => ({ savedReport, reportData, periodKey }))
       );
     }),
@@ -2082,10 +2153,9 @@ private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
   }
 
   const spaceKey = client.spaceKey;
-  const space = this.getSpaceByKey(spaceKey);
 
   const deleteFromBDAndUpdateUI = () => {
-    this.autolavadoService.deleteClientFromBackend(client.id).pipe(takeUntil(this.destroy$)).subscribe({
+    this.autolavadoService.deleteServiceFromBackend(client.id).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         delete this.paymentColorsByClientId[client.id.toString()];
         this.savePaymentColors();
@@ -2104,22 +2174,6 @@ private async eliminarServicioWithGlobalConfirm(client: Client): Promise<void> {
       }
     });
   };
-
-  if (space && space.occupied) {
-    this.autolavadoService.releaseSpace(spaceKey).pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => deleteFromBDAndUpdateUI(),
-      error: (err) => {
-        if (Number(err?.status || 0) === 0) {
-          this.showWarningToast('Espacio liberado localmente. Se sincronizara cuando vuelva la conexion.');
-          return;
-        }
-
-        console.error('Error al liberar espacio', err);
-        this.showErrorToast('Error al liberar el espacio. El servicio no se elimino.');
-      }
-    });
-    return;
-  }
 
   deleteFromBDAndUpdateUI();
 }

@@ -7,15 +7,18 @@ import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmService } from '../../services/confirm.service';
 import { ReportsApiService } from '../../services/reports-api.service';
+import { ServiceHistoryApiService } from '../../services/api/service-history-api.service';
 
 interface ReportListRow {
   raw: Report;
   id: number;
   timestamp: string;
   periodTypeLabel: 'Diario' | 'Mensual';
-  periodTitle: string;      // Para tabla
-  periodLabel: string;      // Para HTML detalle
-  periodDateLabel: string;  // Para HTML detalle
+  reportTypeLabel: string;
+  reportTypeBadgeClass: string;
+  periodTitle: string;
+  periodLabel: string;
+  periodDateLabel: string;
   totalSpaces: number;
   occupiedSpaces: number;
   freeSpaces: number;
@@ -48,6 +51,7 @@ export class ReportsListComponent implements OnInit{
 
   constructor(
     private reportsApi: ReportsApiService,
+    private serviceHistoryApi: ServiceHistoryApiService,
     private autolavadoService: AutolavadoService,
     private toastService: ToastService,
     private confirmService: ConfirmService,
@@ -234,11 +238,15 @@ export class ReportsListComponent implements OnInit{
     const servicesCount = this.safeParseArray(report.filteredClients).length;
     const totalCobrado = this.resolveTotalCobrado(report);
 
+    const { reportTypeLabel, reportTypeBadgeClass } = this.resolveReportType(report);
+
     return {
       raw: report,
       id: report.id,
       timestamp: report.timestamp,
       periodTypeLabel: periodType,
+      reportTypeLabel,
+      reportTypeBadgeClass,
       periodTitle: periodDateLabel,
       periodLabel,
       periodDateLabel,
@@ -249,6 +257,19 @@ export class ReportsListComponent implements OnInit{
       servicesCount,
       totalCobrado
     };
+  }
+
+  private resolveReportType(report: Report): { reportTypeLabel: string; reportTypeBadgeClass: string } {
+    switch (report.reportType) {
+      case 'DAY_CLOSE':  return { reportTypeLabel: 'Cierre del día', reportTypeBadgeClass: 'bg-success' };
+      case 'SCHEDULED':  return { reportTypeLabel: 'Programado',     reportTypeBadgeClass: 'bg-info text-dark' };
+      case 'MONTHLY':    return { reportTypeLabel: 'Mensual',         reportTypeBadgeClass: 'bg-warning text-dark' };
+      case 'MANUAL':     return { reportTypeLabel: 'Manual',          reportTypeBadgeClass: 'bg-secondary' };
+      default:
+        if (report.periodType === 'MONTHLY') return { reportTypeLabel: 'Mensual', reportTypeBadgeClass: 'bg-warning text-dark' };
+        if (report.dailyFinal)               return { reportTypeLabel: 'Cierre del día', reportTypeBadgeClass: 'bg-success' };
+        return { reportTypeLabel: 'Manual', reportTypeBadgeClass: 'bg-secondary' };
+    }
   }
 
   private safeParseArray(json: string | undefined): any[] {
@@ -272,6 +293,56 @@ export class ReportsListComponent implements OnInit{
     }
   }
 
+
+  triggerDayClose(): void {
+    void this.triggerDayCloseWithConfirm();
+  }
+
+  private async triggerDayCloseWithConfirm(): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Cierre manual del día',
+      message: 'Esto cerrará el día actual (hora Argentina), generará el reporte DAY_CLOSE y reseteará los espacios activos. Solo ejecutar si el cierre automático no funcionó.',
+      confirmText: 'Ejecutar cierre',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    this.reportsApi.manualDayClose().subscribe({
+      next: () => {
+        this.toastService.showSuccess('Cierre del día ejecutado correctamente.');
+        this.loadReports();
+      },
+      error: (err) => {
+        this.toastService.showError('Error al ejecutar el cierre: ' + (err?.error?.message ?? err?.message ?? 'Error desconocido'));
+      }
+    });
+  }
+
+  resetHistory(): void {
+    void this.resetHistoryWithConfirm();
+  }
+
+  private async resetHistoryWithConfirm(): Promise<void> {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Reset del histórico',
+      message: 'Esto eliminará TODOS los registros del histórico de servicios. Los reportes existentes no se borran pero las estadísticas quedarán vacías hasta que se generen nuevos cierres. Esta acción no se puede deshacer.',
+      confirmText: 'Resetear histórico',
+      cancelText: 'Cancelar',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    this.serviceHistoryApi.resetAll().subscribe({
+      next: () => {
+        this.toastService.showSuccess('Histórico reseteado correctamente. Los nuevos servicios se acumularán desde ahora.');
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.toastService.showError('Error al resetear el histórico: ' + (err?.error?.message ?? err?.message ?? 'Error desconocido'));
+      }
+    });
+  }
 
   trackByReportId(index: number, row: ReportListRow): number {
   return row?.id ?? index;

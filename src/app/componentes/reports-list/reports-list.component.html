@@ -8,7 +8,7 @@
   >
     <div class="reports-modal__header d-flex justify-content-between align-items-center gap-2">
       <h2 id="reports-modal-title" class="h4 mb-0">Lista de Reportes</h2>
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
         <button class="btn btn-outline-primary btn-sm" (click)="refreshReports()">Recargar</button>
         <button type="button" class="btn btn-outline-light btn-sm" (click)="closeModal()" aria-label="Cerrar modal">
           Cerrar
@@ -36,7 +36,7 @@
             </select>
             <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">Limpiar</button>
             <div class="ms-auto text-muted small">
-              Página {{ currentPageLabel }} / {{ totalPages || 1 }} · {{ totalElements }} reportes
+              Pagina {{ currentPageLabel }} / {{ totalPages || 1 }} · {{ totalElements }} reportes
             </div>
           </div>
 
@@ -61,8 +61,8 @@
                 <tr *ngFor="let row of reportRows; trackBy: trackByReportId">
                   <td>{{ row.id }}</td>
                   <td>
-                    <span class="badge" [ngClass]="row.periodTypeLabel === 'Mensual' ? 'bg-warning text-dark' : 'bg-info text-dark'">
-                      {{ row.periodTypeLabel }}
+                    <span class="badge" [ngClass]="row.reportTypeBadgeClass">
+                      {{ row.reportTypeLabel }}
                     </span>
                   </td>
                   <td>{{ row.periodTitle }}</td>
