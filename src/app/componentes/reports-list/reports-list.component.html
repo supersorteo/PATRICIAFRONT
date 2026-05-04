@@ -52,11 +52,11 @@
                 </div>
               </label>
               <label class="reports-filters__field reports-filters__field--type">
-                <span class="reports-filters__label">Periodo</span>
+                <span class="reports-filters__label">Tipo</span>
                 <select
                   class="form-select reports-filters__select"
-                  [(ngModel)]="periodTypeFilter"
-                  (change)="onPeriodTypeChange()">
+                  [(ngModel)]="reportTypeFilter"
+                  (change)="onReportTypeChange()">
                   <option *ngFor="let option of reportTypeOptions" [value]="option.value">{{ option.label }}</option>
                 </select>
               </label>
@@ -122,8 +122,9 @@
                     <button class="btn btn-sm btn-outline-primary me-1" (click)="viewReport(row.id)">Ver</button>
                     <button class="btn btn-sm btn-outline-danger" (click)="deleteReport(row.id)">Eliminar</button>
                     <button
-                      *ngIf="row.raw.reportType === 'DAY_CLOSE'"
+                      *ngIf="row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons"
                       class="btn btn-sm btn-warning ms-1"
+                      title="Modo dev (Ctrl+A → Ctrl+M)"
                       (click)="deleteReportMethod1(row.id)">
                       Method1
                     </button>

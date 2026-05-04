@@ -1,4 +1,5 @@
 ﻿import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
+import * as XLSX from 'xlsx';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil, combineLatest, catchError, of, map, switchMap, forkJoin } from 'rxjs';
@@ -141,6 +142,7 @@ lastScheduledSnapshotDay = '';
 lastCloseDay = '';
 dailyCloseTime = '23:59';
 showCloseTestPanel = false;
+showResetHistorico = false;
 currentPageToday = 1;
 pageSizeToday = 5;
 dailyClients: Client[] = [];
@@ -184,6 +186,14 @@ private readonly reportsKeyboardShortcutHandler = (event: KeyboardEvent) => {
     event.preventDefault();
     this.showCloseTestPanel = false;
     this.toastService.showInfo('Panel de cierre diario oculto.');
+    this.cdr.markForCheck();
+    return;
+  }
+
+  if (key === 'h') {
+    event.preventDefault();
+    this.showResetHistorico = !this.showResetHistorico;
+    this.toastService.showInfo(this.showResetHistorico ? 'Reset histórico visible.' : 'Reset histórico oculto.');
     this.cdr.markForCheck();
   }
 };
@@ -505,6 +515,49 @@ closeStatsPanel(): void {
 
 resetStatsHistory(): void {
   void this.resetStatsHistoryWithConfirm();
+}
+
+exportStatsToExcel(): void {
+  void this.exportStatsToExcelWithConfirm();
+}
+
+private async exportStatsToExcelWithConfirm(): Promise<void> {
+  if (!this.statsClients.length) {
+    this.toastService.showError('No hay datos para exportar.');
+    return;
+  }
+
+  const confirmed = await this.confirmService.confirm({
+    title: 'Exportar a Excel',
+    message: `¿Exportar ${this.statsClients.length} servicios del período "${this.statsPeriodLabel}" a Excel?`,
+    confirmText: 'Exportar',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+
+  if (!confirmed) return;
+
+  const rows = this.statsClients.map(c => ({
+    'Cliente':         c.name || '-',
+    'DNI':             c.dni || '-',
+    'Código':          c.code || '-',
+    'Vehículo':        c.vehicle || '-',
+    'Categoría':       c.category || '-',
+    'Método de pago':  c.paymentMethod || '-',
+    'Precio ($)':      c.price ?? 0,
+    'Entrada':         c.entryTimestamp ? this.formatEntryDate(c.entryTimestamp) : '-',
+    'Espacio':         c.spaceKey || '-',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [20,14,10,14,12,16,12,18,10].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Servicios');
+
+  const safeLabel = (this.statsPeriodLabel || this.statsMode).replace(/[^a-zA-Z0-9_\-]/g, '_');
+  XLSX.writeFile(wb, `servicios_${safeLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+  this.toastService.showSuccess('Excel exportado correctamente.');
 }
 
 private async resetStatsHistoryWithConfirm(): Promise<void> {

@@ -637,8 +637,20 @@
         <h5 class="mb-0 fw-bold">Estadisticas de Servicios</h5>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-danger btn-sm" type="button" (click)="resetStatsHistory()">
-          Reset historico
+        <button
+          *ngIf="showResetHistorico"
+          class="btn btn-outline-danger btn-sm"
+          type="button"
+          title="Ctrl+H para mostrar/ocultar"
+          (click)="resetStatsHistory()">
+          <i class="bi bi-trash3 me-1"></i>Reset historico
+        </button>
+        <button
+          class="btn btn-sm stats-export-btn"
+          type="button"
+          title="Exportar a Excel"
+          (click)="exportStatsToExcel()">
+          <i class="bi bi-file-earmark-spreadsheet-fill"></i>
         </button>
         <button class="btn-close btn-close-white" type="button" (click)="closeStatsPanel()"></button>
       </div>

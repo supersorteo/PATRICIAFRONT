@@ -43,16 +43,21 @@ export class ReportsListComponent implements OnInit{
   isLoading = false;
   dateFrom = '';
   dateTo = '';
-  periodTypeFilter = '';
+  reportTypeFilter = '';
   page = 0;
   pageSize = 20;
   totalPages = 0;
   totalElements = 0;
+  showMethod1Buttons = false;
   private searchTimer: any = null;
+  private method1SeqArmed = false;
+  private method1SeqTimer: any = null;
   readonly reportTypeOptions = [
-    { value: '', label: 'Todos los periodos' },
-    { value: 'DAILY', label: 'Diarios' },
-    { value: 'MONTHLY', label: 'Mensuales' }
+    { value: '', label: 'Todos los tipos' },
+    { value: 'DAY_CLOSE', label: 'Cierre del día' },
+    { value: 'SCHEDULED', label: 'Programado' },
+    { value: 'MANUAL', label: 'Manual' },
+    { value: 'MONTHLY', label: 'Mensual' }
   ];
 
   constructor(
@@ -83,10 +88,10 @@ export class ReportsListComponent implements OnInit{
       params = params.set('dateTo', this.dateTo);
     }
 
-    const normalizedPeriodType = this.periodTypeFilter.trim();
+    const normalizedReportType = this.reportTypeFilter.trim();
 
-    if (normalizedPeriodType) {
-      params = params.set('periodType', normalizedPeriodType);
+    if (normalizedReportType) {
+      params = params.set('reportType', normalizedReportType);
     }
 
     this.reportsApi.getPage(params).subscribe({
@@ -210,9 +215,31 @@ export class ReportsListComponent implements OnInit{
     this.loadReports();
   }
 
-  onPeriodTypeChange(): void {
+  onReportTypeChange(): void {
     this.page = 0;
     this.loadReports();
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocKeyDown(event: KeyboardEvent): void {
+    const key = (event.key || '').toLowerCase();
+    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+
+    if (key === 'a') {
+      this.method1SeqArmed = true;
+      if (this.method1SeqTimer) clearTimeout(this.method1SeqTimer);
+      this.method1SeqTimer = setTimeout(() => { this.method1SeqArmed = false; }, 2000);
+      return;
+    }
+
+    if (key === 'm' && this.method1SeqArmed) {
+      event.preventDefault();
+      this.method1SeqArmed = false;
+      if (this.method1SeqTimer) { clearTimeout(this.method1SeqTimer); this.method1SeqTimer = null; }
+      this.showMethod1Buttons = !this.showMethod1Buttons;
+      this.toastService.showInfo(this.showMethod1Buttons ? 'Modo dev: Method1 visible.' : 'Modo dev: Method1 oculto.');
+      this.cdr.markForCheck();
+    }
   }
 
   clearFilters(): void {
@@ -222,13 +249,13 @@ export class ReportsListComponent implements OnInit{
     }
     this.dateFrom = '';
     this.dateTo = '';
-    this.periodTypeFilter = '';
+    this.reportTypeFilter = '';
     this.page = 0;
     this.loadReports();
   }
 
   get hasActiveFilters(): boolean {
-    return !!this.dateFrom || !!this.dateTo || !!this.periodTypeFilter.trim();
+    return !!this.dateFrom || !!this.dateTo || !!this.reportTypeFilter.trim();
   }
 
   get currentPageLabel(): number {
