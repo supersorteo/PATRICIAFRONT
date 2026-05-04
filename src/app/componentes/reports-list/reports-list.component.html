@@ -143,12 +143,27 @@
             <button class="btn btn-sm btn-outline-primary ms-2" (click)="refreshReports()">Recargar</button>
           </div>
 
-          <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
-            <button class="btn btn-outline-secondary btn-sm" (click)="goPrevPage()" [disabled]="!canGoPrevPage || isLoading">
-              Anterior
+          <div class="reports-pagination">
+            <button
+              class="reports-pagination__btn"
+              (click)="goPrevPage()"
+              [disabled]="!canGoPrevPage || isLoading"
+              aria-label="Página anterior">
+              <i class="bi bi-chevron-left"></i>
+              <span>Anterior</span>
             </button>
-            <button class="btn btn-outline-secondary btn-sm" (click)="goNextPage()" [disabled]="!canGoNextPage || isLoading">
-              Siguiente
+            <div class="reports-pagination__track">
+              <span class="reports-pagination__current">{{ currentPageLabel }}</span>
+              <span class="reports-pagination__sep">de</span>
+              <span class="reports-pagination__total">{{ totalPages || 1 }}</span>
+            </div>
+            <button
+              class="reports-pagination__btn"
+              (click)="goNextPage()"
+              [disabled]="!canGoNextPage || isLoading"
+              aria-label="Página siguiente">
+              <span>Siguiente</span>
+              <i class="bi bi-chevron-right"></i>
             </button>
           </div>
         </div>

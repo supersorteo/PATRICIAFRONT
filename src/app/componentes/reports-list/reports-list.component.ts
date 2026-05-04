@@ -45,7 +45,7 @@ export class ReportsListComponent implements OnInit{
   dateTo = '';
   reportTypeFilter = '';
   page = 0;
-  pageSize = 20;
+  pageSize = 7;
   totalPages = 0;
   totalElements = 0;
   showMethod1Buttons = false;

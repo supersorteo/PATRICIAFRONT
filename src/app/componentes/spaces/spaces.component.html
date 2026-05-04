@@ -1447,15 +1447,30 @@
         <i class="bi bi-file-earmark-excel me-2"></i>
         Exportar BD a Excel
       </button>
-      <div class="ms-auto d-flex align-items-center gap-2">
-        <span class="text-muted small">
-          Página {{ clientsAdminPageLabel }} / {{ clientsAdminTotalPages || 1 }} · {{ clientsAdminTotalElements }} clientes
-        </span>
-        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToPreviousClientsAdminPage()" [disabled]="!canGoToPreviousClientsAdminPage || isLoadingClientsAdmin">
-          Anterior
+      <div class="clients-pagination ms-auto">
+        <button
+          class="clients-pagination__btn"
+          type="button"
+          (click)="goToPreviousClientsAdminPage()"
+          [disabled]="!canGoToPreviousClientsAdminPage || isLoadingClientsAdmin"
+          aria-label="Página anterior">
+          <i class="bi bi-chevron-left"></i>
+          <span>Anterior</span>
         </button>
-        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="goToNextClientsAdminPage()" [disabled]="!canGoToNextClientsAdminPage || isLoadingClientsAdmin">
-          Siguiente
+        <div class="clients-pagination__track">
+          <span class="clients-pagination__current">{{ clientsAdminPageLabel }}</span>
+          <span class="clients-pagination__sep">de</span>
+          <span class="clients-pagination__total">{{ clientsAdminTotalPages || 1 }}</span>
+          <span class="clients-pagination__count">· {{ clientsAdminTotalElements }} clientes</span>
+        </div>
+        <button
+          class="clients-pagination__btn"
+          type="button"
+          (click)="goToNextClientsAdminPage()"
+          [disabled]="!canGoToNextClientsAdminPage || isLoadingClientsAdmin"
+          aria-label="Página siguiente">
+          <span>Siguiente</span>
+          <i class="bi bi-chevron-right"></i>
         </button>
       </div>
     </div>
