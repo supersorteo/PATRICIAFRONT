@@ -527,9 +527,12 @@ private async exportStatsToExcelWithConfirm(): Promise<void> {
     return;
   }
 
+  const periodLabel = this.statsPeriodLabel;
+  const totalCobrado = this.statsClients.reduce((s, c) => s + (c.price ?? 0), 0);
+
   const confirmed = await this.confirmService.confirm({
     title: 'Exportar a Excel',
-    message: `¿Exportar ${this.statsClients.length} servicios del período "${this.statsPeriodLabel}" a Excel?`,
+    message: `¿Exportar ${this.statsClients.length} servicios del período "${periodLabel}" a Excel?`,
     confirmText: 'Exportar',
     cancelText: 'Cancelar',
     variant: 'primary'
@@ -537,25 +540,75 @@ private async exportStatsToExcelWithConfirm(): Promise<void> {
 
   if (!confirmed) return;
 
-  const rows = this.statsClients.map(c => ({
-    'Cliente':         c.name || '-',
-    'DNI':             c.dni || '-',
-    'Código':          c.code || '-',
-    'Vehículo':        c.vehicle || '-',
-    'Categoría':       c.category || '-',
-    'Método de pago':  c.paymentMethod || '-',
-    'Precio ($)':      c.price ?? 0,
-    'Entrada':         c.entryTimestamp ? this.formatEntryDate(c.entryTimestamp) : '-',
-    'Espacio':         c.spaceKey || '-',
-  }));
+  const todayDisplay = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const todayIso     = new Date().toISOString().slice(0, 10);
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [20,14,10,14,12,16,12,18,10].map(w => ({ wch: w }));
+  let docTitle: string;
+  let fileName: string;
+
+  if (this.statsMode === 'month') {
+    const monthName = this.statsMonthOptions.find(m => m.value === this.statsSelectedMonth)?.label ?? '';
+    docTitle = `SERVICIOS DEL MES — ${monthName.toUpperCase()} ${this.statsSelectedYear}  (hasta ${todayDisplay})`;
+    fileName = `servicios_del_mes_${monthName}_${this.statsSelectedYear}_hasta_${todayIso}.xlsx`;
+  } else if (this.statsMode === 'week') {
+    const weekLabel = this.statsWeekOptions[this.statsSelectedWeekIndex]?.label || periodLabel;
+    docTitle = `SERVICIOS DE LA SEMANA — ${weekLabel}`;
+    fileName = `servicios_semana_${periodLabel.replace(/[^a-zA-Z0-9\-]/g, '_')}.xlsx`;
+  } else {
+    docTitle = `SERVICIOS DEL DÍA — ${periodLabel}`;
+    fileName = `servicios_dia_${this.statsDateInput || todayIso}.xlsx`;
+  }
+
+  const metaRow = `Generado el: ${todayDisplay}   |   Total servicios: ${this.statsClients.length}   |   Total cobrado: $${totalCobrado.toLocaleString('es-AR')}`;
+
+  const headers = ['Cliente', 'DNI', 'Código', 'Vehículo', 'Categoría', 'Método de pago', 'Precio ($)', 'Entrada', 'Espacio'];
+
+  const dataRows = this.statsClients.map(c => [
+    c.name        || '-',
+    c.dni         || '-',
+    c.code        || '-',
+    c.vehicle     || '-',
+    c.category    || '-',
+    c.paymentMethod || '-',
+    c.price       ?? 0,
+    c.entryTimestamp ? this.formatEntryDate(c.entryTimestamp) : '-',
+    c.spaceKey    || '-',
+  ]);
+
+  const totalRowOffset = 4 + dataRows.length + 1;
+  const aoa: any[][] = [
+    [docTitle],                                                                   // fila 0: título
+    [metaRow],                                                                    // fila 1: metadata
+    [],                                                                           // fila 2: separador
+    headers,                                                                      // fila 3: cabeceras
+    ...dataRows,                                                                  // filas 4..N: datos
+    [],                                                                           // separador
+    ['', '', '', '', '', 'TOTAL COBRADO:', totalCobrado, '', ''],                 // total
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  const lastColIdx = headers.length - 1;
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
+  ];
+
+  ws['!cols'] = [22, 14, 10, 14, 12, 17, 13, 20, 10].map(w => ({ wch: w }));
+
+  // Negrita en el título, cabeceras y fila de total (solo si hay estilos disponibles)
+  const boldCell = (addr: string) => {
+    if (ws[addr]) ws[addr].s = { font: { bold: true } };
+  };
+  boldCell('A1');
+  boldCell('A2');
+  headers.forEach((_, i) => boldCell(`${String.fromCharCode(65 + i)}4`));
+  boldCell(`F${totalRowOffset + 1}`);
+  boldCell(`G${totalRowOffset + 1}`);
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Servicios');
-
-  const safeLabel = (this.statsPeriodLabel || this.statsMode).replace(/[^a-zA-Z0-9_\-]/g, '_');
-  XLSX.writeFile(wb, `servicios_${safeLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, fileName);
 
   this.toastService.showSuccess('Excel exportado correctamente.');
 }

@@ -144,6 +144,11 @@ export class ReportsListComponent implements OnInit{
   }
 
   deleteReport(id: number): void {
+    const row = this.reportRows.find(r => r.id === id);
+    if (row?.raw.reportType === 'DAY_CLOSE') {
+      this.toastService.showError('Los reportes de cierre del día no pueden eliminarse porque afectan el reporte mensual.');
+      return;
+    }
     void this.deleteReportWithConfirm(id);
   }
 
