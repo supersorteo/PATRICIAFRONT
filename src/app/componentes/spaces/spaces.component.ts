@@ -1306,6 +1306,8 @@ closeClientsDb(): void {
     clearTimeout(this.clientsAdminSearchTimer);
     this.clientsAdminSearchTimer = null;
   }
+
+  this.cleanupBootstrapModalArtifacts();
 }
 
 
@@ -2248,15 +2250,27 @@ private closeAndResetNewClientModal(): void {
     const modalInstance = bootstrap.Modal.getInstance(modalElement);
     if (modalInstance) {
       modalInstance.hide();
-      setTimeout(() => {
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) backdrop.remove();
-        document.body.classList.remove('modal-open');
-      }, 300);
     }
   }
 
+  setTimeout(() => this.cleanupBootstrapModalArtifacts(), 300);
   this.resetNewClientForm();
+}
+
+private cleanupBootstrapModalArtifacts(): void {
+  document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+
+  document.body.classList.remove('modal-open');
+  document.body.style.removeProperty('overflow');
+  document.body.style.removeProperty('padding-right');
+
+  if (this.isClientsDbOpen) {
+    document.body.style.removeProperty('position');
+    document.body.style.removeProperty('top');
+    document.body.style.removeProperty('width');
+  }
+
+  this.cdr.markForCheck();
 }
 
 get clientsAdminPageLabel(): number {

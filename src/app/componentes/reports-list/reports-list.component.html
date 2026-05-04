@@ -19,24 +19,59 @@
     <div class="reports-modal__body">
       <div class="card reports-card">
         <div class="card-body">
-          <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-            <div class="input-group" style="max-width: 320px;">
-              <input
-                type="text"
-                class="form-control"
-                placeholder="Buscar por periodo o fecha..."
-                [(ngModel)]="searchTerm"
-                (input)="onSearchChange()"
-              >
+          <div class="reports-filters mb-3">
+            <div class="reports-filters__controls">
+              <label class="reports-filters__field reports-filters__field--date">
+                <span class="reports-filters__label">
+                  <i class="bi bi-calendar-event me-1"></i>Desde
+                </span>
+                <div class="reports-filters__input-shell reports-filters__input-shell--date">
+                  <input
+                    type="date"
+                    class="reports-filters__input reports-filters__date-input"
+                    [(ngModel)]="dateFrom"
+                    [max]="dateTo"
+                    (change)="onDateChange()"
+                    aria-label="Fecha desde"
+                  >
+                </div>
+              </label>
+              <label class="reports-filters__field reports-filters__field--date">
+                <span class="reports-filters__label">
+                  <i class="bi bi-calendar-check me-1"></i>Hasta
+                </span>
+                <div class="reports-filters__input-shell reports-filters__input-shell--date">
+                  <input
+                    type="date"
+                    class="reports-filters__input reports-filters__date-input"
+                    [(ngModel)]="dateTo"
+                    [min]="dateFrom"
+                    (change)="onDateChange()"
+                    aria-label="Fecha hasta"
+                  >
+                </div>
+              </label>
+              <label class="reports-filters__field reports-filters__field--type">
+                <span class="reports-filters__label">Periodo</span>
+                <select
+                  class="form-select reports-filters__select"
+                  [(ngModel)]="periodTypeFilter"
+                  (change)="onPeriodTypeChange()">
+                  <option *ngFor="let option of reportTypeOptions" [value]="option.value">{{ option.label }}</option>
+                </select>
+              </label>
+              <div class="reports-filters__actions">
+                <button
+                  class="btn reports-filters__clear-btn"
+                  [disabled]="!hasActiveFilters"
+                  (click)="clearFilters()">
+                  <i class="bi bi-x-circle me-1"></i> Limpiar
+                </button>
+              </div>
             </div>
-            <select class="form-select" style="max-width: 180px;" [(ngModel)]="periodTypeFilter" (change)="onPeriodTypeChange()">
-              <option value="">Todos</option>
-              <option value="DAILY">Diario</option>
-              <option value="MONTHLY">Mensual</option>
-            </select>
-            <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">Limpiar</button>
-            <div class="ms-auto text-muted small">
-              Pagina {{ currentPageLabel }} / {{ totalPages || 1 }} · {{ totalElements }} reportes
+            <div class="reports-filters__meta">
+              <span class="reports-filters__meta-pill">Pagina {{ currentPageLabel }} / {{ totalPages || 1 }}</span>
+              <span class="reports-filters__meta-pill reports-filters__meta-pill--accent">{{ totalElements }} reportes</span>
             </div>
           </div>
 

@@ -41,13 +41,19 @@ export class ReportsListComponent implements OnInit{
   reports: Report[] = [];
   reportRows: ReportListRow[] = [];
   isLoading = false;
-  searchTerm = '';
+  dateFrom = '';
+  dateTo = '';
   periodTypeFilter = '';
   page = 0;
   pageSize = 20;
   totalPages = 0;
   totalElements = 0;
   private searchTimer: any = null;
+  readonly reportTypeOptions = [
+    { value: '', label: 'Todos los periodos' },
+    { value: 'DAILY', label: 'Diarios' },
+    { value: 'MONTHLY', label: 'Mensuales' }
+  ];
 
   constructor(
     private reportsApi: ReportsApiService,
@@ -69,12 +75,15 @@ export class ReportsListComponent implements OnInit{
       .set('page', this.page.toString())
       .set('size', this.pageSize.toString());
 
-    const normalizedSearch = this.searchTerm.trim();
-    const normalizedPeriodType = this.periodTypeFilter.trim();
-
-    if (normalizedSearch) {
-      params = params.set('search', normalizedSearch);
+    if (this.dateFrom) {
+      params = params.set('dateFrom', this.dateFrom);
     }
+
+    if (this.dateTo) {
+      params = params.set('dateTo', this.dateTo);
+    }
+
+    const normalizedPeriodType = this.periodTypeFilter.trim();
 
     if (normalizedPeriodType) {
       params = params.set('periodType', normalizedPeriodType);
@@ -196,12 +205,9 @@ export class ReportsListComponent implements OnInit{
     this.loadReports();
   }
 
-  onSearchChange(): void {
+  onDateChange(): void {
     this.page = 0;
-    if (this.searchTimer) {
-      clearTimeout(this.searchTimer);
-    }
-    this.searchTimer = setTimeout(() => this.loadReports(), 300);
+    this.loadReports();
   }
 
   onPeriodTypeChange(): void {
@@ -210,10 +216,19 @@ export class ReportsListComponent implements OnInit{
   }
 
   clearFilters(): void {
-    this.searchTerm = '';
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
+    this.dateFrom = '';
+    this.dateTo = '';
     this.periodTypeFilter = '';
     this.page = 0;
     this.loadReports();
+  }
+
+  get hasActiveFilters(): boolean {
+    return !!this.dateFrom || !!this.dateTo || !!this.periodTypeFilter.trim();
   }
 
   get currentPageLabel(): number {
