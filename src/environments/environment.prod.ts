@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  backendUrl: 'https://excellsiorback-production.up.railway.app',
-  apiUrl: 'https://excellsiorback-production.up.railway.app/api'
+  backendUrl: 'https://patriciaback-production.up.railway.app',
+  apiUrl: 'https://patriciaback-production.up.railway.app/api'
 };
