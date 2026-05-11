@@ -3876,14 +3876,7 @@ launchWhatsApp(): void {
   if (this.whatsappLink) {
     this.qrService.downloadQR('qrcode', `${this.qrCaption}.png`);
     window.open(this.whatsappLink, '_blank');
-    if (this.selectedSpaceKey) {
-      this.autolavadoService.markSpaceWhatsappSent(this.selectedSpaceKey, true);
-    }
-    // this.closeWhatsAppModalOccupied();
-
-    //this.hasCopiedMessageOccupied = false
     this.hasCopiedMessage = false;
-    // No cerramos el modal aquí
   }
 }
 
@@ -3905,7 +3898,8 @@ launchWhatsAppRelease(): void {
   const sentSpaceKey = this.selectedSpace?.key || this.selectedSpaceKey;
   if (sentSpaceKey) {
     this.sentReleaseWhatsappBySpace.add(sentSpaceKey);
-    this.saveSentWhatsappState(); // Guardar en localStorage
+    this.saveSentWhatsappState();
+    this.autolavadoService.markSpaceWhatsappSent(sentSpaceKey, true);
   }
 
   this.hasCopiedMessageOccupied = false;
