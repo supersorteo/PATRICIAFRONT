@@ -58,6 +58,14 @@ export class ReportsApiService {
   }
 
   finalizeAndCloseDay(): Observable<void> {
-    return this.http.post<void>(`${this.apiBase}/reports/daily/finalize-and-close`, {});
+    // Envía la fecha local del browser como parámetro explícito.
+    // Esto garantiza que el backend use la fecha correcta del operador
+    // independientemente del timezone del servidor (UTC en cloud).
+    const localDate = new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd
+    return this.http.post<void>(
+      `${this.apiBase}/reports/daily/finalize-and-close`,
+      {},
+      { params: { day: localDate } }
+    );
   }
 }

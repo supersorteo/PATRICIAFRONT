@@ -1655,7 +1655,8 @@ saveDailyCloseTime(): void {
 private persistScheduleConfig(mode: 'snapshot' | 'close'): void {
   const normalizedTime = (this.scheduledTime || '').trim();
   const normalizedServerTime = this.localTimeToServerTime(normalizedTime);
-  const normalizedCloseTime = (this.dailyCloseTime || '').trim();
+  const rawCloseTime = (this.dailyCloseTime || '').trim();
+  const normalizedCloseTime = this.localTimeToServerTime(rawCloseTime) || rawCloseTime;
   const payload: ReportScheduleConfig = {
     enabled: !!normalizedServerTime,
     dailySnapshotTime: normalizedServerTime || null,
@@ -1739,7 +1740,8 @@ private applyScheduleConfig(config: ReportScheduleConfig | null | undefined, sou
   const previousCloseDay = this.lastCloseDay || '';
 
   this.reportBusinessTimeZone = (config?.businessTimeZone || this.browserTimeZone).trim() || this.browserTimeZone;
-  this.dailyCloseTime = (config?.dailyCloseTime || '23:59').trim() || '23:59';
+  const rawServerCloseTime = (config?.dailyCloseTime || '23:59').trim() || '23:59';
+  this.dailyCloseTime = this.serverTimeToLocalTime(rawServerCloseTime) || rawServerCloseTime;
   this.scheduledTimeServer = config?.dailySnapshotTime || '';
   this.scheduledTime = this.serverTimeToLocalTime(this.scheduledTimeServer) || '';
   this.lastScheduledSnapshotDay = config?.lastSnapshotDay || '';
