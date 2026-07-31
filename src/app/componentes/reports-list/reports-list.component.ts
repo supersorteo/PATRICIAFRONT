@@ -230,7 +230,7 @@ export class ReportsListComponent implements OnInit{
     const key = (event.key || '').toLowerCase();
     if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
 
-    if (key === 'a') {
+    if (key === 'q') {
       this.method1SeqArmed = true;
       if (this.method1SeqTimer) clearTimeout(this.method1SeqTimer);
       this.method1SeqTimer = setTimeout(() => { this.method1SeqArmed = false; }, 2000);

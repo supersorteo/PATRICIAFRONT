@@ -6,6 +6,7 @@
     "start": "ng serve",
     "start:dev-remote": "ng serve --configuration=dev-remote --port=8889",
     "build": "ng build",
+    "migrate:clients": "node scripts/normalize-legacy-clients.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

@@ -120,13 +120,19 @@
                   </td>
                   <td>
                     <button class="btn btn-sm btn-outline-primary me-1" (click)="viewReport(row.id)">Ver</button>
-                    <button class="btn btn-sm btn-outline-danger" (click)="deleteReport(row.id)">Eliminar</button>
+                    <button class="btn btn-sm"
+                      [class.btn-outline-danger]="!(row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons)"
+                      [class.btn-warning]="row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons"
+                      [title]="row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons ? 'Modo dev (Ctrl+Q -> Ctrl+M)' : 'Eliminar reporte'"
+                      (click)="row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons ? deleteReportMethod1(row.id) : deleteReport(row.id)">
+                      {{ row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons ? 'Eliminar como Admin' : 'Eliminar' }}
+                    </button>
                     <button
-                      *ngIf="row.raw.reportType === 'DAY_CLOSE' && showMethod1Buttons"
+                      *ngIf="false"
                       class="btn btn-sm btn-warning ms-1"
-                      title="Modo dev (Ctrl+A → Ctrl+M)"
+                      title="Modo dev (Ctrl+Q -> Ctrl+M)"
                       (click)="deleteReportMethod1(row.id)">
-                      Method1
+                      Eliminar como Admin
                     </button>
                   </td>
                 </tr>

@@ -39,8 +39,7 @@ export interface Client {
   qrText: string;
   category?: string;  // Nueva propiedad opcional
   price?: any;
-  //vehicleType?: VehicleType | null;
- // vehicleTypes?: VehicleType[];
+
   clientVehicles?: ClientVehicle[];
   paymentMethod?: string;  // ← NUEVO
   clover?: number | null;
