@@ -1243,6 +1243,8 @@ private toLocalTimestamp(value: any): number | null {
 loadAll(): void {
   const { subsuelos, spaces, clients, currentSubId, vehicleTypes } = this.storageSync.loadState(this.LS_KEYS);
 
+  this.normalizeLegacySpaceDisplayNames(spaces);
+
   // Poblar space.client para espacios ocupados
   Object.values(spaces).forEach(space => {
     if (space.occupied && space.clientId && clients[space.clientId]) {
@@ -1259,6 +1261,17 @@ loadAll(): void {
   if (vehicleTypes.length > 0) {
     this.vehicleTypesSubject.next(vehicleTypes);
   }
+}
+
+private normalizeLegacySpaceDisplayNames(spaces: { [key: string]: Space }): void {
+  Object.values(spaces || {}).forEach(space => {
+    if (!space?.displayName) return;
+
+    const legacyMatch = space.displayName.match(/^Nombre\s+(\d+)$/i);
+    if (legacyMatch) {
+      space.displayName = `SERVICIO ${legacyMatch[1]}`;
+    }
+  });
 }
 
 
@@ -1380,7 +1393,7 @@ private createSpacesForSubsuelo(subsueloId: string, count: number, spaces: { [ke
       hold: false,
       clientId: null,
       startTime: null,
-      displayName: `Nombre ${i}`,
+      displayName: `SERVICIO ${i}`,
       client: null,  // No enviar
 
     };
@@ -1449,7 +1462,7 @@ addSpacesToCurrent(count: number): void {
       clientId: null,
       startTime: null,
       client: null,
-      displayName: `Nombre ${n}`
+      displayName: `SERVICIO ${n}`
     };
 
     spaces[key] = newSpace;
