@@ -1601,12 +1601,14 @@ private upsertClientVehicleInList(item: ClientVehicleItem): void {
 
   // Si el modelo ya existe, se actualizan solo sus propios datos.
   // Esto evita que una entrada creada como placeholder conserve matrícula/notas viejas.
-  const sameModelIdx = this.clientVehiclesList.findIndex(v =>
-    this.normalizeVehicleModel(v.model) === modelNorm
+  const placeholderIndex = this.clientVehiclesList.findIndex(v =>
+    this.normalizeVehicleModel(v.model) === modelNorm &&
+    !(v.plate || '').toString().trim() &&
+    !(v.notes || '').toString().trim()
   );
-  if (sameModelIdx >= 0) {
-    const existing = this.clientVehiclesList[sameModelIdx];
-    this.clientVehiclesList[sameModelIdx] = {
+  if (placeholderIndex >= 0) {
+    const existing = this.clientVehiclesList[placeholderIndex];
+    this.clientVehiclesList[placeholderIndex] = {
       model: existing.model || incoming.model,
       plate: incoming.plate || existing.plate || '',
       notes: incoming.notes || existing.notes || ''
@@ -1702,8 +1704,7 @@ openClientVehiclesModal(): void {
     next: (reservations) => {
       const rows = this.sortReservationsDesc(reservations);
       const latest = rows[0];
-
-      this.clientVehiclesList = latest ? this.mapClientVehiclesFromBackend(latest) : [];
+      this.clientVehiclesList = this.collectVehiclesFromReservations(rows);
 
       console.log('[Vehículos modal] Antes de merge con form actual', {
         dni,
@@ -3230,12 +3231,9 @@ private refreshClientReservationsFromBackendByDni(dni: string): void {
 
       if (!rows.length) return;
 
-      const latest = rows[0];
 
       // Rehidratar lista de vehículos desde backend (fuente real)
-      if (latest.clientVehicles?.length) {
-        this.clientVehiclesList = this.mapClientVehiclesFromBackend(latest);
-      }
+      this.clientVehiclesList = this.collectVehiclesFromReservations(rows);
 
       // Si el formulario sigue apuntando al mismo DNI, refrescar campos visibles
       const currentFormDni = (this.clientForm.get('dni')?.value || '').toString().trim();
@@ -3403,7 +3401,9 @@ private hydrateClientFormFromReservation(client: Client, reservations: Client[] 
 
   // Use ONLY the latest reservation's clientVehicles as authoritative source.
   // Aggregating across all historical reservations caused stale/deleted vehicles to re-appear.
-  const backendVehicles = this.mapClientVehiclesFromBackend(client);
+  const backendVehicles = this.collectVehiclesFromReservations(
+    reservations?.length ? reservations : [client]
+  );
   this.clientVehiclesList = backendVehicles;
 
   if (backendVehicles.length > 0) {
