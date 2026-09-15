@@ -22,7 +22,7 @@ export class AiChatComponent {
   question = '';
   isLoading = false;
   messages: ChatMessage[] = [
-    { role: 'patry', text: '¡Hola! Soy Patry 🤖 ¿En qué te puedo ayudar con el sistema Exellssior?' }
+    { role: 'patry', text: '¡Hola! Soy Patry. ¿En qué te puedo ayudar con el sistema Exellssior?' }
   ];
 
   constructor(private aiService: AiApiService) {}
@@ -49,10 +49,12 @@ export class AiChatComponent {
         this.isLoading = false;
         this.scrollToBottom();
       },
-      error: () => {
+      error: (error) => {
         this.messages.push({
           role: 'patry',
-          text: 'No pude conectarme en este momento. Intentá de nuevo en unos segundos.'
+          text: error.status === 401 || error.status === 403
+            ? 'Tu sesión expiró. Iniciá sesión nuevamente para usar Patry.'
+            : 'No pude conectarme en este momento. Intentá de nuevo en unos segundos.'
         });
         this.isLoading = false;
         this.scrollToBottom();

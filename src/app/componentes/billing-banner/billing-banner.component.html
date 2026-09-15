@@ -1,0 +1,154 @@
+<!-- FAB flotante — botón de campana en esquina inferior derecha -->
+<div class="bb-fab-wrap">
+
+  <!-- Badge de pendientes -->
+  <button class="bb-fab" (click)="togglePanel()" [class.bb-fab--active]="panelOpen"
+    [title]="'Facturas (Ctrl+Alt+P)'" aria-label="Notificaciones de facturación">
+    <svg class="bb-fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span class="bb-fab__badge" *ngIf="pendingCount > 0">{{ pendingCount }}</span>
+  </button>
+
+  <!-- Panel lateral deslizable -->
+  <div class="bb-panel" [class.bb-panel--open]="panelOpen">
+    <div class="bb-panel__inner">
+      <!-- Header del panel -->
+      <div class="bb-panel__header">
+        <div class="bb-panel__title">
+          <span class="bb-panel__title-icon">💳</span>
+          <span>Facturación</span>
+          <span class="bb-panel__shortcut" [class.bb-panel__shortcut--active]="deleteMode"
+            title="Ctrl+Alt+P activa modo eliminar">
+            {{ deleteMode ? '🗑 Modo eliminar' : 'Ctrl+Alt+P' }}
+          </span>
+        </div>
+        <button class="bb-panel__close" (click)="closePanel()" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Vista: lista de facturas -->
+      <ng-container *ngIf="!selectedReport">
+
+        <div class="bb-panel__summary" *ngIf="pendingCount > 0">
+          <div class="bb-alert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="bb-alert__icon">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>{{ pendingCount }} factura{{ pendingCount > 1 ? 's' : '' }} pendiente{{ pendingCount > 1 ? 's' : '' }} de pago</span>
+          </div>
+        </div>
+
+        <div class="bb-panel__list" *ngIf="!loading; else loadingTpl">
+          <div *ngIf="reports.length === 0" class="bb-empty">
+            <span>Sin facturas registradas</span>
+          </div>
+
+          <div class="bb-invoice-item" *ngFor="let r of reports"
+            [class.bb-invoice-item--pending]="r.status === 'PENDING'"
+            [class.bb-invoice-item--paid]="r.status === 'PAID'">
+
+            <div class="bb-invoice-item__left" (click)="openDetail(r)">
+              <div class="bb-invoice-item__period">{{ r.periodLabel }}</div>
+              <div class="bb-invoice-item__meta">{{ r.clientName }} · {{ formatDate(r.sentAt) }}</div>
+            </div>
+
+            <div class="bb-invoice-item__right">
+              <span class="bb-status-chip" [class.bb-status-chip--paid]="r.status === 'PAID'">
+                {{ r.status === 'PENDING' ? 'PENDIENTE' : 'PAGADO' }}
+              </span>
+              <button class="bb-delete-btn"
+                *ngIf="deleteMode"
+                (click)="deleteReport(r.id)"
+                [disabled]="deletingId === r.id"
+                title="Eliminar factura"
+                aria-label="Eliminar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #loadingTpl>
+          <div class="bb-loading">Cargando facturas…</div>
+        </ng-template>
+      </ng-container>
+
+      <!-- Vista: detalle de factura -->
+      <ng-container *ngIf="selectedReport">
+        <div class="bb-panel__back">
+          <button class="bb-back-btn" (click)="closeDetail()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Volver a la lista
+          </button>
+        </div>
+
+        <div class="bb-detail" *ngIf="reportData">
+          <div class="bb-detail__period">{{ selectedReport.periodLabel }}</div>
+
+          <div class="bb-totals">
+            <div class="bb-tot-card">
+              <div class="bb-tot-card__label">{{ reportData.prevLabel || 'MES ANTERIOR' }}</div>
+              <div class="bb-tot-card__amount">${{ (reportData.prevTotal || 0).toFixed(2) }}</div>
+              <div class="bb-tot-card__cur">USD</div>
+            </div>
+            <div class="bb-tot-card bb-tot-card--curr">
+              <div class="bb-tot-card__label">{{ reportData.currLabel || 'MES ACTUAL' }}</div>
+              <div class="bb-tot-card__amount">${{ getTotalConAdmin().toFixed(2) }}</div>
+              <div class="bb-tot-card__cur">USD</div>
+            </div>
+          </div>
+
+          <div class="bb-admin-row" *ngIf="reportData.adminCost">
+            {{ reportData.adminLabel || 'GASTOS ADMINISTRATIVOS' }}: ${{ reportData.adminCost }} USD
+          </div>
+
+          <div class="bb-svc-list">
+            <div class="bb-svc" *ngFor="let svc of getServices()">
+              <div class="bb-svc__head">
+                <span>{{ svc.emoji }} {{ svc.name }}</span>
+                <span>${{ getSvcTotal(svc).toFixed(4) }}</span>
+              </div>
+              <div class="bb-svc__row" *ngFor="let it of svc.items">
+                <span class="bb-svc__res">{{ it.r }}</span>
+                <span class="bb-svc__use">{{ it.u }}</span>
+                <span class="bb-svc__cost">${{ (+it.c||0).toFixed(4) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bb-total-row">
+            <span>Total a pagar</span>
+            <strong>${{ getTotalConAdmin().toFixed(2) }} USD</strong>
+          </div>
+
+          <div class="bb-status-row">
+            <span class="bb-status-chip" [class.bb-status-chip--paid]="selectedReport.status === 'PAID'">
+              {{ selectedReport.status === 'PENDING' ? '⏳ Pendiente' : '✅ Pagado' }}
+            </span>
+            <span class="bb-date-hint" *ngIf="selectedReport.paidAt">
+              Pagado el {{ formatDate(selectedReport.paidAt) }}
+            </span>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>

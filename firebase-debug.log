@@ -1,0 +1,206 @@
+[debug] [2026-07-31T11:51:52.436Z] ----------------------------------------------------------------------
+[debug] [2026-07-31T11:51:52.439Z] Command:       C:\nvm4w\nodejs\node.exe C:\Users\Leo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --project exellssior-app --debug
+[debug] [2026-07-31T11:51:52.440Z] CLI Version:   14.6.0
+[debug] [2026-07-31T11:51:52.440Z] Platform:      win32
+[debug] [2026-07-31T11:51:52.440Z] Node Version:  v24.15.0
+[debug] [2026-07-31T11:51:52.440Z] Time:          Fri Jul 31 2026 07:51:52 GMT-0400 (hora de verano de Cuba)
+[debug] [2026-07-31T11:51:52.440Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-31T11:51:52.625Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-31T11:51:52.626Z] > authorizing via signed-in user (soporte.supersorteo@gmail.com)
+[debug] [2026-07-31T11:51:52.627Z] [iam] checking project exellssior-app for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-07-31T11:51:52.628Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:52.628Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:52.629Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions [none]
+[debug] [2026-07-31T11:51:52.630Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions x-goog-quota-user=projects/exellssior-app
+[debug] [2026-07-31T11:51:52.630Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-31T11:51:53.571Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions 200
+[debug] [2026-07-31T11:51:53.572Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-07-31T11:51:53.573Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:53.573Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:53.574Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app [none]
+[debug] [2026-07-31T11:51:54.431Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app 200
+[debug] [2026-07-31T11:51:54.431Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app {"projectId":"exellssior-app","projectNumber":"910227541425","displayName":"EXELLSSIOR-APP","name":"projects/exellssior-app","resources":{"hostingSite":"exellssior-app"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_3c6b9ec9-9015-41c8-8410-141add9e0251"}
+[info] 
+[info] === Deploying to 'exellssior-app'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-07-31T11:51:54.435Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:54.435Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:54.435Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions [none]
+[debug] [2026-07-31T11:51:54.435Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2026-07-31T11:51:56.749Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions 200
+[debug] [2026-07-31T11:51:56.749Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions {"name":"projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[exellssior-app]: beginning deploy... 
+[info] i  hosting[exellssior-app]: found 17 files in dist/alisson17/browser 
+[debug] [2026-07-31T11:51:56.785Z] [hosting] uploading with 200 concurrency
+[debug] [2026-07-31T11:51:56.835Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:56.836Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:56.837Z] [hosting] hash cache [ZGlzdFxhbGlzc29uMTdcYnJvd3Nlcg] stored for 17 files
+[debug] [2026-07-31T11:51:56.838Z] [hosting][hash queue][FINAL] {"max":47,"min":0,"avg":11.117647058823529,"active":0,"complete":17,"success":17,"errored":0,"retried":0,"total":17,"elapsed":51}
+[debug] [2026-07-31T11:51:56.839Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780:populateFiles [none]
+[debug] [2026-07-31T11:51:56.839Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780:populateFiles {"files":{"/favicon.ico":"a905b13e228420df3dbe746dfb656d37a49736494c0737d00e007c8dc7319912","/assets/portfolio/exellsior-spaces.svg":"5b3dcfac897b1c66d84b8d7ac479c924b74b0013f902fd8baef99175fe2257d3","/assets/portfolio/exellsior-reports.svg":"a8c750b771454440c82b7b8166e0f79c6ba506d4ba24f73800cdd20776d66fa5","/assets/portfolio/exellsior-overview.svg":"9e770f1d171b4fe1dc223dcb48fe0f6d409a1959804c965e4f48797f672d1a33","/assets/portfolio/exellsior-clients.svg":"4a1fb60883b0498b13297ac39ac3828cf08f75793785d6fc5eb47d535d2ad40c","/assets/portada/portada_autolavado.jpg":"4bc7e64d1118626495e2c4c074a87df6137704406d87faccd953aa6985439ee8","/assets/portada/EXELLSSIOR.JPG":"7f8d5eee868a1ba73f710e57281849ffd66c38ac1c8dc237a7ab2d2986862ac1","/assets/logo/logo_autolvadao.jpg":"5f2dcf3936bfeccc12118ffa21681754c24d3b589894c947ab9638e6b30822ea","/index.html":"0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23","/scripts-EEEIPNC3.js":"26c90e1931403ac8c7ac055e27cdffc8795ff243a1e3e20a43f3bc99c461304a","/polyfills-RT5I6R6G.js":"54e72a58ee132476e8d86a9a4b5bb9f9457d65f834a5eac0cfe86eb09a5b4032","/media/flags-645KQKNA.png":"2fa7d0a1a78df3f240ea6d9a26a9d0075c1275ad33b32503706de9b01a1f1193","/media/bootstrap-icons-CVBWLLHT.woff2":"9bbd1a9a4f2c1815120516b2f5df05a97e5078c62268e2f6a2a36d8d54b6b725","/media/flags@2x-E4CMA2OR.png":"d007989214cbad1008b63697e2debf54395459d0f34119aa8f0c72d62c98bd2a","/media/bootstrap-icons-VQNJTM6Q.woff":"4a0b4e72f5538b3f1a654d4a54031127a6337e84e8664502dbdeb3abcdc326d6","/styles-ZQJK4B33.css":"77e215bc36d5e22e476f1ee211b3f1c0ab363ee7b91ec28d87a2c613b545d0e7","/main-ZQI6D2M6.js":"9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3"}}
+[debug] [2026-07-31T11:51:57.847Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780:populateFiles 200
+[debug] [2026-07-31T11:51:57.848Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780:populateFiles {"uploadRequiredHashes":["0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23","9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files"}
+[debug] [2026-07-31T11:51:57.849Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:57.850Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:57.850Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:57.851Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:51:57.851Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23 [none]
+[debug] [2026-07-31T11:51:57.851Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23 [stream]
+[debug] [2026-07-31T11:51:57.853Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3 [none]
+[debug] [2026-07-31T11:51:57.853Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3 [stream]
+[debug] [2026-07-31T11:51:57.856Z] [hosting][populate queue][FINAL] {"max":1016,"min":1016,"avg":1016,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":1021}
+[debug] [2026-07-31T11:51:57.856Z] [hosting] uploads queued: 2
+[info] i  hosting: uploading new files [0/2] (0%) 
+[debug] [2026-07-31T11:51:59.452Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23 200
+[debug] [2026-07-31T11:51:59.453Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/0c0dd39bb607ec32f10fcd7271c6e32dce2edacfeb5be7fb4eb9fd15021dbf23 [stream]
+[debug] [2026-07-31T11:52:00.384Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3 200
+[debug] [2026-07-31T11:52:00.385Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/01f2e54c0dd8d780/files/9f237e9561b5591c2bd1dd4f827d7af62285ca54db8869d44c518f1e9c987fd3 [stream]
+[debug] [2026-07-31T11:52:00.385Z] [hosting][upload queue][FINAL] {"max":2535,"min":1605,"avg":2070,"active":0,"complete":2,"success":2,"errored":0,"retried":0,"total":2,"elapsed":2537}
+[info] i  hosting: upload complete 
+[info] +  hosting[exellssior-app]: file upload complete 
+[debug] [2026-07-31T11:52:00.386Z] [hosting] deploy completed after 3631ms
+[debug] [2026-07-31T11:52:00.387Z] [
+  {
+    "config": {
+      "public": "dist/alisson17/browser",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "site": "exellssior-app"
+    },
+    "version": "projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780"
+  }
+]
+[info] i  hosting[exellssior-app]: finalizing version... 
+[debug] [2026-07-31T11:52:00.389Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:52:00.389Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:52:00.389Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/01f2e54c0dd8d780 updateMask=status%2Cconfig
+[debug] [2026-07-31T11:52:00.390Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/01f2e54c0dd8d780 {"status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]}}
+[debug] [2026-07-31T11:52:01.647Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/01f2e54c0dd8d780 200
+[debug] [2026-07-31T11:52:01.687Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/01f2e54c0dd8d780 {"name":"projects/910227541425/sites/exellssior-app/versions/01f2e54c0dd8d780","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-07-31T11:51:55.682826Z","createUser":{"email":"soporte.supersorteo@gmail.com"},"finalizeTime":"2026-07-31T11:52:01.551816Z","finalizeUser":{"email":"soporte.supersorteo@gmail.com"}}
+[debug] [2026-07-31T11:52:01.696Z] [hosting] finalized version for exellssior-app:[object Object]
+[info] +  hosting[exellssior-app]: version finalized 
+[info] i  hosting[exellssior-app]: releasing new version... 
+[debug] [2026-07-31T11:52:01.698Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:52:01.698Z] Checked if tokens are valid: true, expires at: 1785502089359
+[debug] [2026-07-31T11:52:01.699Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases versionName=projects%2F910227541425%2Fsites%2Fexellssior-app%2Fversions%2F01f2e54c0dd8d780
+[debug] [2026-07-31T11:52:01.699Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases {}
+[debug] [2026-07-31T11:52:02.956Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases 200
+[debug] [2026-08-01T12:43:26.032Z] ----------------------------------------------------------------------
+[debug] [2026-08-01T12:43:26.035Z] Command:       C:\nvm4w\nodejs\node.exe C:\Users\Leo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --project exellssior-app
+[debug] [2026-08-01T12:43:26.035Z] CLI Version:   14.6.0
+[debug] [2026-08-01T12:43:26.035Z] Platform:      win32
+[debug] [2026-08-01T12:43:26.036Z] Node Version:  v24.15.0
+[debug] [2026-08-01T12:43:26.036Z] Time:          Sat Aug 01 2026 08:43:26 GMT-0400 (hora de verano de Cuba)
+[debug] [2026-08-01T12:43:26.036Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-08-01T12:43:26.038Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-08-01T12:43:26.330Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-08-01T12:43:26.331Z] > authorizing via signed-in user (soporte.supersorteo@gmail.com)
+[debug] [2026-08-01T12:43:26.331Z] [iam] checking project exellssior-app for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-08-01T12:43:26.332Z] Checked if tokens are valid: false, expires at: 1785502089359
+[debug] [2026-08-01T12:43:26.332Z] Checked if tokens are valid: false, expires at: 1785502089359
+[debug] [2026-08-01T12:43:26.333Z] > refreshing access token with scopes: []
+[debug] [2026-08-01T12:43:26.334Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-08-01T12:43:26.334Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-01T12:43:26.968Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-08-01T12:43:26.968Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-08-01T12:43:27.185Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-08-01T12:43:27.186Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-08-01T12:43:27.218Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions [none]
+[debug] [2026-08-01T12:43:27.218Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions x-goog-quota-user=projects/exellssior-app
+[debug] [2026-08-01T12:43:27.218Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-08-01T12:43:28.209Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions 200
+[debug] [2026-08-01T12:43:28.210Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/exellssior-app:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-08-01T12:43:28.212Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:28.212Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:28.213Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app [none]
+[debug] [2026-08-01T12:43:29.352Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app 200
+[debug] [2026-08-01T12:43:29.352Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/exellssior-app {"projectId":"exellssior-app","projectNumber":"910227541425","displayName":"EXELLSSIOR-APP","name":"projects/exellssior-app","resources":{"hostingSite":"exellssior-app"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_3c6b9ec9-9015-41c8-8410-141add9e0251"}
+[info] 
+[info] === Deploying to 'exellssior-app'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-08-01T12:43:29.366Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:29.366Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:29.367Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions [none]
+[debug] [2026-08-01T12:43:29.367Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2026-08-01T12:43:31.075Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions 200
+[debug] [2026-08-01T12:43:31.075Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions {"name":"projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[exellssior-app]: beginning deploy... 
+[info] i  hosting[exellssior-app]: found 17 files in dist/alisson17/browser 
+[debug] [2026-08-01T12:43:31.119Z] [hosting] uploading with 200 concurrency
+[debug] [2026-08-01T12:43:31.180Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:31.180Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:31.182Z] [hosting] hash cache [ZGlzdFxhbGlzc29uMTdcYnJvd3Nlcg] stored for 17 files
+[debug] [2026-08-01T12:43:31.183Z] [hosting][hash queue][FINAL] {"max":45,"min":0,"avg":9.764705882352942,"active":0,"complete":17,"success":17,"errored":0,"retried":0,"total":17,"elapsed":51}
+[debug] [2026-08-01T12:43:31.184Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262:populateFiles [none]
+[debug] [2026-08-01T12:43:31.184Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262:populateFiles {"files":{"/favicon.ico":"a905b13e228420df3dbe746dfb656d37a49736494c0737d00e007c8dc7319912","/assets/portfolio/exellsior-spaces.svg":"5b3dcfac897b1c66d84b8d7ac479c924b74b0013f902fd8baef99175fe2257d3","/assets/portfolio/exellsior-reports.svg":"a8c750b771454440c82b7b8166e0f79c6ba506d4ba24f73800cdd20776d66fa5","/assets/portfolio/exellsior-overview.svg":"9e770f1d171b4fe1dc223dcb48fe0f6d409a1959804c965e4f48797f672d1a33","/assets/portfolio/exellsior-clients.svg":"4a1fb60883b0498b13297ac39ac3828cf08f75793785d6fc5eb47d535d2ad40c","/assets/portada/portada_autolavado.jpg":"4bc7e64d1118626495e2c4c074a87df6137704406d87faccd953aa6985439ee8","/assets/portada/EXELLSSIOR.JPG":"7f8d5eee868a1ba73f710e57281849ffd66c38ac1c8dc237a7ab2d2986862ac1","/assets/logo/logo_autolvadao.jpg":"5f2dcf3936bfeccc12118ffa21681754c24d3b589894c947ab9638e6b30822ea","/index.html":"8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803","/polyfills-RT5I6R6G.js":"54e72a58ee132476e8d86a9a4b5bb9f9457d65f834a5eac0cfe86eb09a5b4032","/scripts-EEEIPNC3.js":"26c90e1931403ac8c7ac055e27cdffc8795ff243a1e3e20a43f3bc99c461304a","/media/flags-645KQKNA.png":"2fa7d0a1a78df3f240ea6d9a26a9d0075c1275ad33b32503706de9b01a1f1193","/media/bootstrap-icons-CVBWLLHT.woff2":"9bbd1a9a4f2c1815120516b2f5df05a97e5078c62268e2f6a2a36d8d54b6b725","/media/flags@2x-E4CMA2OR.png":"d007989214cbad1008b63697e2debf54395459d0f34119aa8f0c72d62c98bd2a","/media/bootstrap-icons-VQNJTM6Q.woff":"4a0b4e72f5538b3f1a654d4a54031127a6337e84e8664502dbdeb3abcdc326d6","/styles-ZQJK4B33.css":"77e215bc36d5e22e476f1ee211b3f1c0ab363ee7b91ec28d87a2c613b545d0e7","/main-5CFJCMDW.js":"f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814"}}
+[info] i  hosting: adding files to version [0/17] (0%) 
+[info] i  hosting: adding files to version [0/17] (0%) 
+[debug] [2026-08-01T12:43:35.454Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262:populateFiles 200
+[debug] [2026-08-01T12:43:35.455Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262:populateFiles {"uploadRequiredHashes":["f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814","8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files"}
+[debug] [2026-08-01T12:43:35.456Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:35.456Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:35.457Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:35.457Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:35.457Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814 [none]
+[debug] [2026-08-01T12:43:35.457Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814 [stream]
+[debug] [2026-08-01T12:43:35.460Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803 [none]
+[debug] [2026-08-01T12:43:35.460Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803 [stream]
+[debug] [2026-08-01T12:43:35.464Z] [hosting][populate queue][FINAL] {"max":4277,"min":4277,"avg":4277,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":4284}
+[debug] [2026-08-01T12:43:35.465Z] [hosting] uploads queued: 2
+[debug] [2026-08-01T12:43:37.121Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803 200
+[debug] [2026-08-01T12:43:37.122Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/8f91d26c661a3a19c08d9d4e55391dbd49cf89b46c9a1a70b393a7742b1a7803 [stream]
+[info] i  hosting: uploading new files [1/2] (50%) 
+[debug] [2026-08-01T12:43:37.864Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814 200
+[debug] [2026-08-01T12:43:37.865Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/exellssior-app/versions/3b057cbce9c24262/files/f90ddf7c19fa66650bfad16dfd7cdce31f3eac8eea8095ebfaa50cbe2956e814 [stream]
+[debug] [2026-08-01T12:43:37.865Z] [hosting][upload queue][FINAL] {"max":2410,"min":1666,"avg":2038,"active":0,"complete":2,"success":2,"errored":0,"retried":0,"total":2,"elapsed":2410}
+[info] i  hosting: upload complete 
+[info] +  hosting[exellssior-app]: file upload complete 
+[debug] [2026-08-01T12:43:37.865Z] [hosting] deploy completed after 6781ms
+[debug] [2026-08-01T12:43:37.865Z] [
+  {
+    "config": {
+      "public": "dist/alisson17/browser",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ],
+      "site": "exellssior-app"
+    },
+    "version": "projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262"
+  }
+]
+[info] i  hosting[exellssior-app]: finalizing version... 
+[debug] [2026-08-01T12:43:37.867Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:37.868Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:37.868Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/3b057cbce9c24262 updateMask=status%2Cconfig
+[debug] [2026-08-01T12:43:37.868Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/3b057cbce9c24262 {"status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]}}
+[debug] [2026-08-01T12:43:38.699Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/3b057cbce9c24262 200
+[debug] [2026-08-01T12:43:38.700Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/versions/3b057cbce9c24262 {"name":"projects/910227541425/sites/exellssior-app/versions/3b057cbce9c24262","status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2026-08-01T12:43:31.297349Z","createUser":{"email":"soporte.supersorteo@gmail.com"},"finalizeTime":"2026-08-01T12:43:39.391650Z","finalizeUser":{"email":"soporte.supersorteo@gmail.com"}}
+[debug] [2026-08-01T12:43:38.700Z] [hosting] finalized version for exellssior-app:[object Object]
+[info] +  hosting[exellssior-app]: version finalized 
+[info] i  hosting[exellssior-app]: releasing new version... 
+[debug] [2026-08-01T12:43:38.700Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:38.700Z] Checked if tokens are valid: true, expires at: 1785591806186
+[debug] [2026-08-01T12:43:38.700Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases versionName=projects%2F910227541425%2Fsites%2Fexellssior-app%2Fversions%2F3b057cbce9c24262
+[debug] [2026-08-01T12:43:38.700Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases {}
+[debug] [2026-08-01T12:43:39.615Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/exellssior-app/channels/live/releases 200

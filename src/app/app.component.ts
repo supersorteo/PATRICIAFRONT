@@ -7,6 +7,7 @@ import { ReportsComponent } from './componentes/reports/reports.component';
 import { GlobalToastComponent } from './componentes/global-toast/global-toast.component';
 import { GlobalConfirmDialogComponent } from './componentes/global-confirm-dialog/global-confirm-dialog.component';
 import { AiChatComponent } from './componentes/ai-chat/ai-chat.component';
+import { BillingBannerComponent } from './componentes/billing-banner/billing-banner.component';
 import { ConfirmService } from './services/confirm.service';
 import { OfflineSyncService } from './services/offline-sync.service';
 import { ToastService } from './services/toast.service';
@@ -23,7 +24,8 @@ import { combineLatest, distinctUntilChanged, filter, skip } from 'rxjs';
     FormsModule,
     GlobalToastComponent,
     GlobalConfirmDialogComponent,
-    AiChatComponent
+    AiChatComponent,
+    BillingBannerComponent
   ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']

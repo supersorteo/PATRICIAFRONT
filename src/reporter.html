@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generador de Reportes Cloud</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --pri: #a78bfa; --pri-dk: #6e36d1; --bg: #0d1117; --card: #161b22;
+  --panel: #21262d; --tx: #e6edf3; --muted: #8b949e; --bd: #30363d;
+  --gold: #fbbf24; --green: #3fb950; --red: #f85149;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--tx);
+  margin: 0; padding: 0 16px 60px; min-height: 100vh; }
+
+/* ── LOGIN ── */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-card {
+  background: var(--card); border: 1px solid var(--bd); border-radius: 20px;
+  padding: 44px 40px; width: 100%; max-width: 400px;
+  box-shadow: 0 32px 64px rgba(0,0,0,.6), 0 0 0 1px rgba(167,139,250,.1);
+  animation: loginIn .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes loginIn { from { transform: translateY(24px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.login-logo {
+  text-align: center; margin-bottom: 32px;
+}
+.login-logo-icon {
+  width: 56px; height: 56px; background: linear-gradient(135deg,var(--pri-dk),var(--pri));
+  border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 26px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(110,54,209,.4);
+}
+.login-logo h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--tx); letter-spacing: .5px; }
+.login-logo p  { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+
+.login-field { margin-bottom: 18px; }
+.login-field label {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 8px;
+}
+.login-field .input-wrap { position: relative; }
+.login-field input {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--bd);
+  border-radius: 10px; color: var(--tx); font-family: inherit; font-size: 14px;
+  padding: 12px 16px; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.login-field input:focus {
+  border-color: var(--pri);
+  box-shadow: 0 0 0 3px rgba(167,139,250,.15);
+}
+.login-field input.pass-input { padding-right: 48px; }
+.eye-btn {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 18px; padding: 0; line-height: 1; transition: color .15s;
+  display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+}
+.eye-btn:hover { color: var(--pri); }
+.eye-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
+
+.login-err {
+  background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3);
+  border-radius: 8px; color: var(--red); font-size: 13px; padding: 10px 14px;
+  margin-bottom: 16px; display: none;
+}
+.login-btn {
+  width: 100%; background: linear-gradient(135deg,var(--pri-dk),#8b5cf6);
+  border: none; border-radius: 10px; color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 700; padding: 14px;
+  text-transform: uppercase; letter-spacing: 1px; transition: all .2s; margin-top: 8px;
+  box-shadow: 0 4px 16px rgba(110,54,209,.3);
+}
+.login-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(110,54,209,.4); }
+.login-btn:active { transform: none; }
+
+/* ── GENERATOR ── */
+#gen { max-width: 860px; margin: 0 auto; padding-top: 40px; }
+.gen-head { text-align: center; margin-bottom: 36px; }
+.gen-head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; color: var(--pri);
+  text-transform: uppercase; letter-spacing: 1.5px; }
+.gen-head p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.card { background: var(--card); border: 1px solid var(--bd); border-radius: 12px;
+  padding: 22px; margin-bottom: 16px; }
+.card-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--muted); margin: 0 0 16px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fgroup { display: flex; flex-direction: column; gap: 5px; }
+label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+input[type=text], input[type=number] {
+  background: var(--bg); border: 1px solid var(--bd); border-radius: 7px;
+  color: var(--tx); font-family: inherit; font-size: 13px; padding: 9px 12px;
+  outline: none; width: 100%; transition: border-color .15s;
+}
+input[type=number] { font-family: 'JetBrains Mono', monospace; }
+input:focus { border-color: var(--pri); }
+
+.month-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.month-box { border: 1px solid var(--bd); border-radius: 9px; padding: 14px; background: var(--bg); }
+.month-box.curr { border-color: rgba(167,139,250,.4); background: rgba(167,139,250,.05); }
+.month-box-title { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 2px; color: var(--muted); margin: 0 0 12px; }
+.auto-total { padding: 9px 12px; background: var(--bg); border: 1px solid var(--bd);
+  border-radius: 7px; font-family: 'JetBrains Mono', monospace; color: var(--pri);
+  font-weight: 700; font-size: 14px; min-height: 36px; display: flex; align-items: center; }
+
+.svc-block { border: 1px solid var(--bd); border-radius: 9px; padding: 14px;
+  margin-bottom: 10px; background: var(--bg); }
+.svc-top { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.svc-top input:first-child { width: 52px !important; text-align: center; font-size: 18px; flex-shrink: 0; padding: 7px 4px; }
+.svc-top input:last-child { flex: 1; }
+
+.items-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 28px; gap: 6px;
+  align-items: center; margin-bottom: 4px; }
+.items-grid.header span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); font-weight: 600; padding: 0 2px; }
+.items-grid input { margin: 0; }
+
+.svc-foot { display: flex; justify-content: flex-end; align-items: center; margin-top: 8px; gap: 8px; }
+.svc-subtotal { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.svc-subtotal strong { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--pri); }
+
+.res-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 28px; gap: 6px;
+  align-items: center; margin-bottom: 6px; }
+
+.icon-btn { background: none; border: 1px solid var(--bd); color: var(--muted); width: 28px; height: 28px;
+  border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center;
+  justify-content: center; transition: all .15s; flex-shrink: 0; padding: 0; line-height: 1; }
+.icon-btn:hover { border-color: var(--red); color: var(--red); }
+
+.add-row { background: none; border: 1px dashed var(--bd); color: var(--muted); border-radius: 7px;
+  padding: 7px 14px; font-size: 12px; font-family: inherit; cursor: pointer; width: 100%;
+  transition: all .15s; margin-top: 4px; }
+.add-row:hover { border-color: var(--pri); color: var(--pri); }
+
+.add-svc-btn { background: none; border: 1px dashed var(--bd); color: var(--muted); border-radius: 9px;
+  padding: 12px 14px; font-size: 13px; font-family: inherit; cursor: pointer; width: 100%;
+  transition: all .15s; }
+.add-svc-btn:hover { border-color: var(--pri); color: var(--pri); }
+
+.totbar { display: flex; justify-content: space-between; align-items: center;
+  background: rgba(167,139,250,.08); border: 1px solid rgba(167,139,250,.25);
+  border-radius: 10px; padding: 14px 20px; margin-bottom: 16px; }
+.totbar-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); font-weight: 700; }
+.totbar-amount { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 800; color: var(--pri); }
+
+.gen-btn { width: 100%; background: var(--pri-dk); color: #fff; border: none; border-radius: 10px;
+  padding: 15px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 1px; transition: all .2s; }
+.gen-btn:hover { background: var(--pri); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(110,54,209,.3); }
+
+/* ── REPORT BAR ── */
+#rep-bar { position: sticky; top: 0; z-index: 200; background: rgba(13,17,23,.96);
+  backdrop-filter: blur(12px); border-bottom: 1px solid var(--bd);
+  padding: 10px 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.a-btn { border: 1px solid var(--bd); background: var(--card); color: var(--tx);
+  padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600;
+  font-family: inherit; transition: all .15s; }
+.a-btn:hover { border-color: var(--pri); color: var(--pri); }
+.a-btn.accent { background: var(--pri-dk); border-color: var(--pri-dk); color: #fff; }
+.a-btn.accent:hover { background: var(--pri); }
+.a-btn.send-btn { border-color: var(--green); color: var(--green); }
+.a-btn.send-btn:hover { background: rgba(63,185,80,.15); }
+#copy-ok { color: var(--green); font-size: 12px; font-weight: 600; }
+#send-ok { color: var(--green); font-size: 12px; font-weight: 600; }
+
+/* ── REPORT CONTENT ── */
+#rep-output { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+.r-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--bd); }
+.r-header h1 { margin: 0; color: var(--pri); font-size: 26px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px; }
+.r-header .proj { font-size: 15px; color: var(--muted); margin-top: 7px; }
+.r-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 18px; }
+.r-tot-card { background: var(--bg); border: 1px solid var(--bd); border-radius: 12px; padding: 28px; text-align: center; }
+.r-tot-card.curr { background: linear-gradient(145deg,#161b22,#1e1e2e); border-color: var(--pri); box-shadow: 0 0 18px rgba(110,54,209,.2); }
+.r-tot-card h2 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); }
+.r-tot-card .amt { font-size: 42px; font-weight: 800; margin: 10px 0; color: var(--tx); font-family: 'JetBrains Mono', monospace; }
+.r-tot-card .cur-lbl { font-size: 13px; color: var(--pri); font-weight: 600; }
+.r-admin { background: rgba(251,191,36,.05); border: 1px solid rgba(251,191,36,.3);
+  border-radius: 12px; padding: 16px 20px; text-align: center; margin-bottom: 18px; color: var(--gold); }
+.r-admin h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.r-concepts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  margin-bottom: 40px; background: var(--bg); padding: 18px; border-radius: 12px; border: 1px solid var(--bd); }
+.r-concept-btn { background: var(--panel); border: 1px solid var(--bd); color: var(--tx);
+  padding: 9px 18px; border-radius: 50px; cursor: pointer; font-size: 12px; font-weight: 600;
+  font-family: inherit; transition: all .25s; }
+.r-concept-btn:hover { background: var(--pri-dk); border-color: var(--pri); color: #fff; transform: translateY(-2px); }
+.r-sec-head { margin: 36px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--bd); }
+.r-sec-title { font-size: 16px; font-weight: 700; margin: 0; }
+table.r-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+table.r-table th { background: var(--card); text-align: left; padding: 13px; font-size: 10px;
+  text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--bd); letter-spacing: 1px; }
+table.r-table td { padding: 13px; border-bottom: 1px solid var(--bd); font-size: 13px; }
+table.r-table .svc-row { background: #1c2128; font-weight: 700; color: var(--pri); }
+table.r-table .indent { padding-left: 36px; color: var(--muted); }
+table.r-table .num { text-align: right; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+.r-footer { margin-top: 50px; text-align: center; font-size: 11px; color: var(--muted);
+  padding-top: 24px; border-top: 1px solid var(--bd); }
+
+/* ── MODAL genérico ── */
+.modal { display: none; position: fixed; z-index: 500; inset: 0;
+  background: rgba(0,0,0,.85); backdrop-filter: blur(8px); }
+.modal-box { background: var(--panel); margin: 10% auto; padding: 32px; border-radius: 18px;
+  width: 90%; max-width: 480px; position: relative; border: 1px solid var(--bd);
+  box-shadow: 0 24px 48px rgba(0,0,0,.5); animation: mIn .25s cubic-bezier(.34,1.56,.64,1); }
+@keyframes mIn { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-close { position: absolute; right: 20px; top: 16px; font-size: 26px; cursor: pointer;
+  background: none; border: none; color: var(--muted); line-height: 1; }
+.modal-close:hover { color: var(--tx); }
+.modal-title { color: var(--pri); font-size: 22px; margin: 0 0 12px; }
+.modal-body { color: var(--muted); font-size: 15px; line-height: 1.65; margin: 0; }
+
+/* ── MODAL SEND ── */
+.send-field { margin-bottom: 14px; }
+.send-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 7px; }
+.send-field .input-wrap { position: relative; }
+.send-field input {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--bd); border-radius: 10px;
+  color: var(--tx); font-family: inherit; font-size: 14px; padding: 12px 16px;
+  outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.send-field input:focus { border-color: var(--pri); box-shadow: 0 0 0 3px rgba(167,139,250,.15); }
+.send-field input.has-eye { padding-right: 48px; }
+.send-eye {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  padding: 0; display: flex; align-items: center; transition: color .15s;
+}
+.send-eye:hover { color: var(--pri); }
+.send-eye svg { width: 18px; height: 18px; stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.send-url-info { font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  color: var(--muted); background: var(--bg); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 9px 12px; margin-top: 4px; }
+.send-err { color: var(--red); font-size: 12px; margin-top: 10px; display: none;
+  background: rgba(248,81,73,.08); border: 1px solid rgba(248,81,73,.2);
+  border-radius: 7px; padding: 9px 12px; }
+
+/* ── CONFIRM MODAL ── */
+.confirm-box { background: var(--panel); margin: 12% auto; padding: 36px; border-radius: 18px;
+  width: 90%; max-width: 420px; position: relative; border: 1px solid var(--bd);
+  box-shadow: 0 24px 48px rgba(0,0,0,.5); animation: mIn .2s ease; text-align: center; }
+.confirm-icon { font-size: 44px; margin-bottom: 12px; }
+.confirm-title { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+.confirm-msg { color: var(--muted); font-size: 14px; margin: 0 0 28px; line-height: 1.5; }
+.confirm-actions { display: flex; gap: 10px; justify-content: center; }
+.confirm-cancel { background: none; border: 1px solid var(--bd); color: var(--muted);
+  border-radius: 8px; padding: 10px 24px; cursor: pointer; font-family: inherit; font-size: 13px;
+  transition: all .15s; }
+.confirm-cancel:hover { border-color: var(--tx); color: var(--tx); }
+.confirm-ok { background: var(--green); border: none; border-radius: 8px; color: #fff;
+  padding: 10px 28px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 700;
+  transition: background .15s; }
+.confirm-ok:hover { background: #2da44e; }
+
+/* ── PRINT ── */
+@media print {
+  #rep-bar, #gen, #login-screen, .modal { display: none !important; }
+  #rep { display: block !important; }
+  body { background: #fff; color: #111; padding: 0; }
+  #rep-output { padding: 20px; max-width: none; }
+  :root { --bg: #fff; --card: #f5f5f5; --panel: #eee; --tx: #111; --muted: #555;
+    --bd: #ddd; --pri: #6e36d1; --gold: #b8860b; }
+  .r-tot-card { border: 1px solid #ddd !important; box-shadow: none !important; }
+  table.r-table th { background: #f5f5f5; }
+  table.r-table .svc-row { background: #f0eeff; }
+  .r-concepts { display: none; }
+  .r-admin { border: 1px solid #b8860b; }
+}
+@media (max-width: 580px) {
+  .row2, .month-pair, .r-totals { grid-template-columns: 1fr; }
+  .items-grid, .res-grid { grid-template-columns: 1fr 1fr 70px 28px; }
+  .login-card { padding: 32px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">📊</div>
+      <h1>Generador de Reportes</h1>
+      <p>Acceso restringido — ingresá tus credenciales</p>
+    </div>
+    <div id="login-err" class="login-err"></div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <div class="input-wrap">
+        <input id="l-user" type="text" placeholder="Danilo" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <div class="input-wrap">
+        <input id="l-pass" type="password" placeholder="••••••••" class="pass-input" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" class="eye-btn" id="l-eye" onclick="toggleEye('l-pass','l-eye')">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- ══ GENERATOR ══ -->
+<div id="gen" hidden>
+  <div class="gen-head">
+    <h1>Generador de Reportes Cloud</h1>
+    <p>Completá los datos, generá el reporte y compartí el enlace con tu cliente</p>
+  </div>
+
+  <div class="card">
+    <p class="card-label">Información del Cliente</p>
+    <div class="row2">
+      <div class="fgroup"><label>Nombre del cliente</label>
+        <input id="f-client" type="text" placeholder="Exellssior"></div>
+      <div class="fgroup"><label>Proyecto</label>
+        <input id="f-project" type="text" placeholder="Exellssior App"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">Comparativa de Meses</p>
+    <div class="month-pair">
+      <div class="month-box">
+        <p class="month-box-title">Mes Anterior</p>
+        <div class="fgroup"><label>Nombre del mes</label>
+          <input id="f-prev-label" type="text" placeholder="FEBRERO 2026"></div>
+        <div class="fgroup" style="margin-top:10px"><label>Total USD</label>
+          <input id="f-prev-total" type="number" step="0.01" min="0"></div>
+      </div>
+      <div class="month-box curr">
+        <p class="month-box-title">Mes Actual</p>
+        <div class="fgroup"><label>Nombre del mes</label>
+          <input id="f-curr-label" type="text" placeholder="MARZO 2026"></div>
+        <div class="fgroup" style="margin-top:10px"><label>Total (automático)</label>
+          <div class="auto-total" id="f-curr-auto">$0.00</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">Gastos Administrativos</p>
+    <div class="row2">
+      <div class="fgroup"><label>Descripción</label>
+        <input id="f-admin-label" type="text" placeholder="GASTOS ADMINISTRATIVOS"></div>
+      <div class="fgroup"><label>Monto (USD)</label>
+        <input id="f-admin" type="number" step="0.01" min="0" value="5" oninput="recalc()"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-label">Servicios del Mes Actual</p>
+    <div id="svc-container"></div>
+    <button class="add-svc-btn" onclick="addSvc()">+ Agregar Servicio</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <p class="card-label" style="margin:0">Desglose del Mes Anterior</p>
+      <button class="add-row" style="width:auto;padding:5px 12px;margin:0" onclick="addPrevRes()">+ Recurso</button>
+    </div>
+    <div class="items-grid header">
+      <span>Recurso</span><span>Uso</span><span>Costo USD</span><span></span>
+    </div>
+    <div id="prev-container"></div>
+  </div>
+
+  <div class="totbar">
+    <span class="totbar-label">Total Mes Actual (servicios + administración)</span>
+    <span class="totbar-amount" id="grand-total">$0.00</span>
+  </div>
+
+  <button class="gen-btn" onclick="doGenerate()">Generar y Compartir Reporte →</button>
+</div>
+
+<!-- ══ REPORT ══ -->
+<div id="rep" hidden>
+  <div id="rep-bar">
+    <button class="a-btn" onclick="showGen()">← Editar</button>
+    <button class="a-btn accent" onclick="copyLink()">🔗 Copiar enlace</button>
+    <button class="a-btn" onclick="window.print()">🖨 Imprimir / PDF</button>
+    <button class="a-btn send-btn" onclick="openConfirm()">📤 Enviar a Exellssior</button>
+    <span id="copy-ok" hidden>¡Enlace copiado!</span>
+    <span id="send-ok" hidden>¡Enviado correctamente!</span>
+  </div>
+  <div id="rep-output"></div>
+</div>
+
+<!-- ══ MODAL CONFIRMACIÓN ══ -->
+<div id="confirmModal" class="modal" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-box">
+    <div class="confirm-icon">📨</div>
+    <h3 class="confirm-title">¿Enviar factura?</h3>
+    <p class="confirm-msg" id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="confirm-ok" id="confirm-send-btn" onclick="doSend()">Sí, enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CONCEPTOS ══ -->
+<div id="cModal" class="modal" onclick="if(event.target===this)closeMod()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeMod()">×</button>
+    <h2 id="mTitle" class="modal-title"></h2>
+    <p id="mBody" class="modal-body"></p>
+  </div>
+</div>
+
+<script>
+const CONCEPTS = {
+  cpu:    { t:'🧠 Procesamiento (CPU)',      d:'Potencia de cálculo para ejecutar procesos del servidor. Se mide en vCPU/minuto acumulado.' },
+  ram:    { t:'⚡ Memoria RAM',              d:'Espacio de trabajo activo del servidor. Factor principal de costo en Railway.' },
+  egress: { t:'🌐 Tráfico de Red (Egress)', d:'Transferencia de datos desde el servidor hacia los usuarios.' },
+  volume: { t:'💾 Almacenamiento (Volume)', d:'El disco persistente donde vive la base de datos.' },
+  backup: { t:'🛡️ Respaldos (Backup)',      d:'Copias de seguridad automáticas de la base de datos.' },
+};
+
+// ── CREDENCIALES LOCALES ──
+const LOCAL_USER = 'Danilo';
+const LOCAL_PASS = 'Danilo*123';
+
+let svcCount = 0, prevCount = 0, currentData = null;
+
+// ── LOGIN ──
+function doLogin() {
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  const err = document.getElementById('login-err');
+  err.style.display = 'none';
+  if (u === LOCAL_USER && p === LOCAL_PASS) {
+    try { sessionStorage.setItem('rg-auth','1'); } catch(e){}
+    document.getElementById('login-screen').hidden = true;
+    document.getElementById('gen').hidden = false;
+    initForm();
+  } else {
+    err.textContent = 'Usuario o contraseña incorrectos.';
+    err.style.display = 'block';
+    document.getElementById('l-pass').value = '';
+  }
+}
+
+// ── EYE TOGGLE ──
+function toggleEye(inputId, btnOrId) {
+  const inp = document.getElementById(inputId);
+  const btn = typeof btnOrId === 'string' ? document.getElementById(btnOrId) : btnOrId;
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  const svg = btn.querySelector('svg');
+  if (svg) {
+    svg.innerHTML = showing
+      ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+      : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  }
+}
+
+// ── SERVICES ──
+function addSvc(data) {
+  const id = ++svcCount;
+  const d = data || { emoji:'🖥️', name:'', items:[{r:'',u:'',c:''}] };
+  const wrap = document.createElement('div');
+  wrap.className = 'svc-block'; wrap.id = 's-'+id;
+  wrap.innerHTML = `
+    <div class="svc-top">
+      <input type="text" placeholder="🖥️" value="${esc(d.emoji)}" oninput="recalc()" style="width:52px;text-align:center;font-size:18px">
+      <input type="text" placeholder="Nombre del servicio" value="${esc(d.name)}" oninput="recalc()">
+      <button class="icon-btn" onclick="this.closest('.svc-block').remove();recalc()" title="Eliminar">×</button>
+    </div>
+    <div class="items-grid header">
+      <span>Recurso</span><span>Uso acumulado</span><span>Costo USD</span><span></span>
+    </div>
+    <div id="items-${id}"></div>
+    <button class="add-row" onclick="addItem(${id})">+ Agregar recurso</button>
+    <div class="svc-foot">
+      <div class="svc-subtotal">Subtotal servicio <strong id="st-${id}">$0.00</strong></div>
+    </div>`;
+  document.getElementById('svc-container').appendChild(wrap);
+  (d.items || [{r:'',u:'',c:''}]).forEach(it => addItem(id, it));
+  recalc();
+}
+
+function addItem(sid, data) {
+  const box = document.getElementById('items-'+sid);
+  if (!box) return;
+  const d = data || {r:'',u:'',c:''};
+  const row = document.createElement('div');
+  row.className = 'items-grid';
+  row.innerHTML = `
+    <input type="text" placeholder="CPU, RAM…" value="${esc(d.r)}" oninput="recalc()">
+    <input type="text" placeholder="30000 GB" value="${esc(d.u)}" oninput="recalc()">
+    <input type="number" placeholder="0.00" step="0.0001" min="0" value="${d.c||''}" oninput="recalc()">
+    <button class="icon-btn" onclick="this.parentElement.remove();recalc()">×</button>`;
+  box.appendChild(row);
+  recalc();
+}
+
+function addPrevRes(data) {
+  ++prevCount;
+  const d = data || {r:'',u:'',c:''};
+  const row = document.createElement('div');
+  row.className = 'res-grid';
+  row.innerHTML = `
+    <input type="text" placeholder="Memoria RAM" value="${esc(d.r)}" oninput="recalc()">
+    <input type="text" placeholder="45000 GB/min" value="${esc(d.u)}" oninput="recalc()">
+    <input type="number" placeholder="0.00" step="0.0001" min="0" value="${d.c||''}" oninput="recalc()">
+    <button class="icon-btn" onclick="this.parentElement.remove();recalc()">×</button>`;
+  document.getElementById('prev-container').appendChild(row);
+}
+
+// ── RECALC (tiempo real) ──
+function recalc() {
+  let svcTotal = 0;
+  document.querySelectorAll('.svc-block').forEach(blk => {
+    let sub = 0;
+    blk.querySelectorAll('.items-grid:not(.header) input[type=number]').forEach(n => sub += +n.value||0);
+    const st = blk.querySelector('[id^="st-"]');
+    if (st) st.textContent = '$'+sub.toFixed(4);
+    svcTotal += sub;
+  });
+  const admin = +(document.getElementById('f-admin')?.value||0);
+  const grand = svcTotal + admin;
+  document.getElementById('grand-total').textContent = '$'+grand.toFixed(2);
+  document.getElementById('f-curr-auto').textContent = '$'+grand.toFixed(2);
+}
+
+function readForm() {
+  const svcs = [];
+  document.querySelectorAll('.svc-block').forEach(blk => {
+    const ins = blk.querySelectorAll('.svc-top input[type=text]');
+    const items = [];
+    blk.querySelectorAll('.items-grid:not(.header)').forEach(row => {
+      const i = row.querySelectorAll('input');
+      items.push({r:i[0]?.value||'',u:i[1]?.value||'',c:+(i[2]?.value||0)});
+    });
+    svcs.push({emoji:ins[0]?.value||'',name:ins[1]?.value||'',items});
+  });
+  const prevRes = [];
+  document.querySelectorAll('.res-grid').forEach(row => {
+    const i = row.querySelectorAll('input');
+    prevRes.push({r:i[0]?.value||'',u:i[1]?.value||'',c:+(i[2]?.value||0)});
+  });
+  return {
+    client:     V('f-client'),    project:    V('f-project'),
+    prevLabel:  V('f-prev-label'),prevTotal:  +V('f-prev-total')||0,
+    currLabel:  V('f-curr-label'),adminLabel: V('f-admin-label')||'GASTOS ADMINISTRATIVOS',
+    adminCost:  +V('f-admin')||0, svcs, prevRes
+  };
+}
+
+function V(id) { return (document.getElementById(id)||{}).value||''; }
+function esc(s){ return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function h(s){ const v=s==null?'':String(s); return v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function loadForm(d) {
+  document.getElementById('f-client').value     = d.client||'';
+  document.getElementById('f-project').value    = d.project||'';
+  document.getElementById('f-prev-label').value = d.prevLabel||'';
+  document.getElementById('f-prev-total').value = d.prevTotal||'';
+  document.getElementById('f-curr-label').value = d.currLabel||'';
+  document.getElementById('f-admin-label').value= d.adminLabel||'GASTOS ADMINISTRATIVOS';
+  document.getElementById('f-admin').value      = d.adminCost||'';
+  document.getElementById('svc-container').innerHTML = '';
+  document.getElementById('prev-container').innerHTML = '';
+  svcCount = prevCount = 0;
+  (d.svcs||[]).forEach(s => addSvc(s));
+  (d.prevRes||[]).forEach(r => addPrevRes(r));
+  recalc();
+}
+
+function buildReport(d) {
+  const svcTotal = d.svcs.reduce((t,s) => t+s.items.reduce((st,it) => st+(+it.c||0),0),0);
+  const grand = svcTotal + (d.adminCost||0);
+  let svcRows = '';
+  d.svcs.forEach(s => {
+    const sub = s.items.reduce((t,it) => t+(+it.c||0),0);
+    svcRows += `<tr class="svc-row"><td>${h(s.emoji)} ${h(s.name)}</td><td>-</td><td class="num">$${sub.toFixed(4)}</td></tr>`;
+    s.items.forEach(it => {
+      svcRows += `<tr><td class="indent">${h(it.r)}</td><td class="num">${h(it.u)}</td><td class="num">$${(+it.c||0).toFixed(4)}</td></tr>`;
+    });
+  });
+  const prevRows = (d.prevRes||[]).map(r =>
+    `<tr><td>${h(r.r)}</td><td class="num">${h(r.u)}</td><td class="num">$${(+r.c||0).toFixed(4)}</td></tr>`
+  ).join('');
+
+  return `
+    <div class="r-header">
+      <h1>Reporte de Infraestructura Cloud</h1>
+      <div class="proj">Proyecto: <strong>${h(d.project||d.client)}</strong></div>
+    </div>
+    <div class="r-totals">
+      <div class="r-tot-card">
+        <h2>${h(d.prevLabel||'MES ANTERIOR')}</h2>
+        <div class="amt">$${(d.prevTotal||0).toFixed(2)}</div>
+        <span class="cur-lbl">DÓLARES (USD)</span>
+      </div>
+      <div class="r-tot-card curr">
+        <h2>${h(d.currLabel||'MES ACTUAL')}</h2>
+        <div class="amt">$${grand.toFixed(2)}</div>
+        <span class="cur-lbl">DÓLARES (USD)</span>
+      </div>
+    </div>
+    <div class="r-admin"><h3>${h(d.adminLabel)}: $ ${(d.adminCost||0).toFixed(0)} (DÓLARES)</h3></div>
+    <div class="r-concepts">
+      <button class="r-concept-btn" onclick="openMod('cpu')">🧠 ¿Qué es CPU?</button>
+      <button class="r-concept-btn" onclick="openMod('ram')">⚡ ¿Qué es RAM?</button>
+      <button class="r-concept-btn" onclick="openMod('egress')">🌐 ¿Qué es Egress?</button>
+      <button class="r-concept-btn" onclick="openMod('volume')">💾 ¿Qué es Volume?</button>
+      <button class="r-concept-btn" onclick="openMod('backup')">🛡️ ¿Qué es Backup?</button>
+    </div>
+    <div class="r-sec-head"><h3 class="r-sec-title">Desglose de Servicios (${h(d.currLabel||'Mes Actual')}) — Valores en USD</h3></div>
+    <table class="r-table">
+      <thead><tr><th>Servicio / Recurso</th><th class="num">Uso Acumulado</th><th class="num">Costo ($ USD)</th></tr></thead>
+      <tbody>${svcRows}</tbody>
+    </table>
+    ${prevRows ? `
+    <div class="r-sec-head"><h3 class="r-sec-title">Acumulados Globales (${h(d.prevLabel||'Mes Anterior')}) — Valores en USD</h3></div>
+    <table class="r-table">
+      <thead><tr><th>Métrica Global</th><th class="num">Uso Total</th><th class="num">Costo ($ USD)</th></tr></thead>
+      <tbody>${prevRows}</tbody>
+    </table>` : ''}
+    <div class="r-footer">
+      Este documento es un reporte técnico generado para el cliente <strong>${h(d.client)}</strong>.<br>
+      Todos los montos están expresados en <strong>Dólares Estadounidenses (USD)</strong>.
+    </div>
+    <div style="text-align:center;margin-top:32px">
+      <button onclick="showGen()"
+        style="background:none;border:1px solid var(--bd);color:var(--muted);border-radius:8px;
+        padding:10px 24px;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s"
+        onmouseover="this.style.borderColor='var(--pri)';this.style.color='var(--pri)'"
+        onmouseout="this.style.borderColor='var(--bd)';this.style.color='var(--muted)'">
+        ← Volver al formulario
+      </button>
+    </div>`;
+}
+
+function doGenerate() {
+  const d = readForm(); currentData = d;
+  try { history.replaceState(null,'','#'+btoa(unescape(encodeURIComponent(JSON.stringify(d))))); } catch(e){}
+  try { localStorage.setItem('rg-last',JSON.stringify(d)); } catch(e){}
+  document.getElementById('rep-output').innerHTML = buildReport(d);
+  document.getElementById('gen').hidden = true;
+  document.getElementById('rep').hidden = false;
+  window.scrollTo(0,0);
+}
+
+function showGen() {
+  document.getElementById('rep').hidden = true;
+  document.getElementById('gen').hidden = false;
+  window.scrollTo(0,0);
+}
+
+function copyLink() {
+  const d = readForm(); currentData = d;
+  try { history.replaceState(null,'','#'+btoa(unescape(encodeURIComponent(JSON.stringify(d))))); } catch(e){}
+  const url = window.location.href;
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(showCopyOk);
+  else { const ta=document.createElement('textarea');ta.value=url;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();showCopyOk(); }
+}
+function showCopyOk() {
+  const el=document.getElementById('copy-ok');el.hidden=false;setTimeout(()=>el.hidden=true,2500);
+}
+
+// ── ENVÍO ──
+function detectBackendUrl() {
+  const h = window.location.hostname;
+  return (h === 'localhost' || h === '127.0.0.1' || window.location.protocol === 'file:')
+    ? 'http://localhost:8080'
+    : 'https://patriciaback-production.up.railway.app';
+}
+
+function openConfirm() {
+  const d = currentData || readForm();
+  const url = detectBackendUrl();
+  document.getElementById('confirm-msg').innerHTML =
+    `Se enviará la factura de <strong>${h(d.currLabel||'MES ACTUAL')}</strong> para <strong>${h(d.client||'Exellssior')}</strong>.<br>
+     <span style="font-size:11px;color:var(--muted);display:block;margin-top:6px">Backend: <code>${url}</code></span>`;
+  document.getElementById('confirmModal').style.display = 'block';
+}
+function closeConfirm() { document.getElementById('confirmModal').style.display = 'none'; }
+
+async function doSend() {
+  const backendUrl = detectBackendUrl();
+  const btn = document.getElementById('confirm-send-btn');
+  const d = currentData || readForm();
+  const payload = { username: LOCAL_USER, password: LOCAL_PASS,
+    reportJson: JSON.stringify(d), periodLabel: d.currLabel||'MES ACTUAL', clientName: d.client||'Exellssior' };
+
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    const res = await fetch(`${backendUrl}/api/billing/send`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    });
+    if (!res.ok) { const b=await res.json().catch(()=>({})); throw new Error(b.error||`Error ${res.status}`); }
+    closeConfirm();
+    const ok = document.getElementById('send-ok');
+    ok.hidden = false; setTimeout(()=>ok.hidden=true, 3000);
+  } catch(e) {
+    closeConfirm();
+    alert('Error al enviar: ' + (e.message||'No se pudo conectar al backend.'));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sí, enviar';
+  }
+}
+
+function openMod(k) {
+  document.getElementById('mTitle').textContent = CONCEPTS[k].t;
+  document.getElementById('mBody').textContent  = CONCEPTS[k].d;
+  document.getElementById('cModal').style.display = 'block';
+}
+function closeMod() { document.getElementById('cModal').style.display = 'none'; }
+
+function initForm() {
+  const hash = window.location.hash.slice(1);
+  if (hash) {
+    try {
+      const d = JSON.parse(decodeURIComponent(escape(atob(hash))));
+      loadForm(d); currentData = d;
+      document.getElementById('rep-output').innerHTML = buildReport(d);
+      document.getElementById('gen').hidden = true;
+      document.getElementById('rep').hidden = false;
+      return;
+    } catch(e) {}
+  }
+  try {
+    const saved = localStorage.getItem('rg-last');
+    if (saved) { loadForm(JSON.parse(saved)); return; }
+  } catch(e) {}
+  loadForm({
+    client:'Exellssior', project:'Exellssior App',
+    prevLabel:'FEBRERO 2026', prevTotal:11.09,
+    currLabel:'MARZO 2026', adminLabel:'GASTOS ADMINISTRATIVOS', adminCost:5,
+    svcs:[
+      {emoji:'🚀',name:'ExcellsiorBack',items:[
+        {r:'CPU',u:'35.86 vCPU',c:0.0166},{r:'RAM (Memoria)',u:'30843.90 GB',c:7.1398},{r:'Egress (Tráfico Red)',u:'0.33 GB',c:0.0165}
+      ]},
+      {emoji:'🗄️',name:'MySQL Database',items:[
+        {r:'CPU',u:'262.76 vCPU',c:0.1216},{r:'RAM (Memoria)',u:'15702.20 GB',c:3.6348},
+        {r:'Volume (Disco)',u:'157758.25 GB',c:0.5478},{r:'Egress (Tráfico Red)',u:'0.32 GB',c:0.0162},{r:'Backup (Respaldo)',u:'7585.13 GB',c:0.0263}
+      ]}
+    ],
+    prevRes:[
+      {r:'Memoria RAM',u:'45262.83 GB/min',c:10.4775},{r:'Procesamiento CPU',u:'289.74 vCPU/min',c:0.1341},
+      {r:'Tráfico de Red (Egress)',u:'0.83 GB',c:0.0413},{r:'Almacenamiento (Volume)',u:'122361.40 GB/min',c:0.4249},{r:'Backup Database',u:'4304.67 GB/min',c:0.0149}
+    ]
+  });
+}
+
+// Al cargar: si hay sesión activa saltear login
+(function() {
+  try { if (sessionStorage.getItem('rg-auth')==='1') {
+    document.getElementById('login-screen').hidden = true;
+    document.getElementById('gen').hidden = false;
+    initForm(); return;
+  }} catch(e){}
+  // Mostrar login
+})();
+</script>
+</body>
+</html>
