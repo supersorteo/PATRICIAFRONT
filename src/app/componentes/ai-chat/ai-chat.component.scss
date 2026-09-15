@@ -1,0 +1,231 @@
+// Variables
+$bg-dark: #0B1828;
+$bg-panel: #0F2135;
+$bg-bubble-patry: #132944;
+$bg-bubble-user: #1E3A5F;
+$accent: #12D7D0;
+$text-primary: #E2E8F0;
+$text-muted: #7FA7D6;
+$border: #28476F;
+
+// FAB
+.patry-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: $bg-panel;
+  border: 2px solid $accent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(18, 215, 208, 0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 1000;
+
+  &:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px rgba(18, 215, 208, 0.4);
+  }
+
+  .patry-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+// Panel
+.patry-panel {
+  position: fixed;
+  bottom: 92px;
+  right: 24px;
+  width: 360px;
+  height: 480px;
+  background: $bg-dark;
+  border: 1px solid $border;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: slideUp 0.2s ease-out;
+
+  @media (max-width: 420px) {
+    width: calc(100vw - 32px);
+    right: 16px;
+    bottom: 88px;
+  }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// Header
+.patry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid $border;
+  background: $bg-panel;
+  border-radius: 16px 16px 0 0;
+}
+
+.patry-header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.patry-header-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.patry-name {
+  display: block;
+  color: $accent;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.patry-subtitle {
+  display: block;
+  color: $text-muted;
+  font-size: 11px;
+}
+
+.patry-close {
+  background: none;
+  border: none;
+  color: $text-muted;
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+
+  &:hover { color: $text-primary; }
+}
+
+// Mensajes
+.patry-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: $border; border-radius: 4px; }
+}
+
+.patry-bubble {
+  padding: 10px 13px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  max-width: 85%;
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &--patry {
+    background: $bg-bubble-patry;
+    color: $text-primary;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  &--user {
+    background: $bg-bubble-user;
+    color: $text-primary;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+}
+
+// Loading dots
+.patry-loading {
+  display: flex;
+  gap: 5px;
+  padding: 10px 13px;
+  background: $bg-bubble-patry;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  align-self: flex-start;
+  width: fit-content;
+
+  span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: $accent;
+    animation: bounce 1.2s infinite;
+
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+  }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+// Input
+.patry-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid $border;
+  background: $bg-panel;
+  border-radius: 0 0 16px 16px;
+}
+
+.patry-input {
+  flex: 1;
+  background: $bg-dark;
+  border: 1px solid $border;
+  border-radius: 10px;
+  color: $text-primary;
+  font-size: 13.5px;
+  padding: 9px 12px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  min-height: 38px;
+  max-height: 100px;
+  transition: border-color 0.15s;
+
+  &::placeholder { color: $text-muted; }
+  &:focus { border-color: $accent; }
+  &:disabled { opacity: 0.5; }
+}
+
+.patry-send {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: $accent;
+  border: none;
+  color: #05233A;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.15s;
+
+  &:disabled { opacity: 0.4; cursor: default; transform: none; }
+  &:not(:disabled):hover { opacity: 0.85; transform: scale(1.05); }
+}
